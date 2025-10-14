@@ -1,0 +1,220 @@
+snowflake: |
+  High-impact mappings:
+  - `IFF(cond,a,b)` → `CASE WHEN cond THEN a ELSE b END`
+  - `NVL/COALESCE` keep as `COALESCE`
+  - Semi-structured:
+    - `LATERAL FLATTEN(input => x)` → `LATERAL VIEW explode(x) AS col` (or `inline()` for arrays of structs)
+    - `OBJECT_CONSTRUCT(k,v)` → `named_struct(''k'', v, ...)` (or `map_from_arrays` if you truly need a MAP)
+    - `PARSE_JSON`, `TO_VARIANT` → `from_json(json, schema)` / `get_json_object(json, ''$.path'')`
+  - Aggregates: `ARRAY_AGG` → `collect_list` (use `collect_set` for distinct)
+  - Date/Time:
+    - `DATEADD`, `DATEDIFF`, `DATE_TRUNC` → `date_add` / `timestampdiff` / `date_trunc`
+    - `TO_TIMESTAMP_*` → `to_timestamp(...)`
+  - Qualify:
+    - If native `QUALIFY` isn’t available in your DBR, rewrite with a subquery using `ROW_NUMBER()`; otherwise you may keep `QUALIFY`.
+  - Sampling/hints: rewrite or drop Snowflake-specific options.
+
+  Stored Procedures and Control Flow:
+  - Adapt JavaScript procedures to SQL-only logic where possible
+  - Convert Snowflake-specific SQL functions
+  - Transform result set handling
+
+  Additional considerations:
+  - Please be thorough with data type mappings
+  - For Missing cloud file system scheme error, add s3:// at the start of location
+  
+  Datatypes:
+  - `VARIANT`/`OBJECT`/`ARRAY` → use JSON+schema (`from_json`) or STRUCT/ARRAY as appropriate.
+
+redshift: |
+  High-impact mappings:
+  - `NVL(a,b)` → `COALESCE(a,b)`
+  - `LISTAGG(expr, sep)` → `array_join(collect_list(expr), sep)` (or `collect_set` for distinct)
+  - `DATEADD`/`DATEDIFF`/`DATE_TRUNC` → `date_add` / `timestampdiff` / `date_trunc`
+  - `QUALIFY` (if not supported) → rewrite with subquery + `ROW_NUMBER()`/`RANK()`
+  - JSON:
+    - `json_extract_path_text(col,''a'',''b'')` → `get_json_object(col, ''$.a.b'')`
+  - DDL/storage:
+    - `DISTSTYLE`, `DISTKEY`, `SORTKEY`, `ENCODE`, `COMPOUND/INTERLEAVED` → not applicable; drop or comment
+    - `IDENTITY(seed, step)` → `GENERATED ALWAYS AS IDENTITY` (Delta)
+  - External tables/Spectrum → use `LOCATION ''s3://...''` with Delta/Unity Catalog patterns
+  - "Rewrite analytic functions such as QUALIFY or DISTINCT ON to standard SQL or Databricks equivalents using ROW_NUMBER() in subqueries."
+  
+  Examples:
+  - Redshift QUALIFY ROW_NUMBER() = 1 → Databricks:
+  - Replace DISTINCT ON with ROW_NUMBER or RANK in a subquery:
+    SELECT col1, col2, col3 FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col2 DESC) rn
+    FROM table
+    ) WHERE rn = 1
+
+  Datatypes:
+  - Keep numerics as `DECIMAL(p,s)`; `SUPER` → JSON via `from_json`.
+
+tsql: |
+  High-impact mappings:
+  - `CONVERT(type, expr[, style])` → `CAST(expr AS type)`
+  - `TRY_CONVERT/TRY_CAST` → `CAST(...)` (note: no try semantics; keep logic simple)
+  - `ISNULL(a,b)` → `COALESCE(a,b)`
+  - `GETDATE()`/`SYSDATETIME()` → `CURRENT_TIMESTAMP()`
+  - `DATEADD(unit,n,date)` → for days `date_add(date,n)`; otherwise `timestampadd(unit,n,date)`
+  - `DATEDIFF(unit,start,end)` → `timestampdiff(unit,start,end)` (or `datediff(end,start)` for days)
+  - `FORMAT(ts,''pat'')` → `date_format(ts,''pat'')`
+  - `TOP (n)` → append `LIMIT n`
+  - `CROSS/OUTER APPLY` → LATERAL VIEW + `explode()/posexplode()/inline()`
+  - `IIF(cond,a,b)` → `CASE WHEN cond THEN a ELSE b END`
+  - Brackets `[schema].[table]` → backticks or dots: ``schema.table`` or `` `schema`.`table` ``
+  - Inline table variables (`DECLARE @t TABLE(...)`) should be converted to temp views
+
+  Datatypes:
+  - `VARCHAR/NVARCHAR/TEXT` → `STRING`; `DATETIME*` → `TIMESTAMP`; `MONEY/SMALLMONEY` → `DECIMAL(19,4)`; `VARBINARY/IMAGE` → `BINARY`.
+
+  Procedures & variables:
+  - Convert @parameter to standard parameter names
+  - Replace SET NOCOUNT ON (not needed in Databricks)
+  - Transform BEGIN...END blocks to Databricks syntax
+  - Convert RAISERROR to appropriate error handling
+
+  Example:
+  - `SELECT TOP 10 ISNULL(col,0) FROM t;` → `SELECT COALESCE(col, 0) FROM t LIMIT 10;`
+
+oracle: |
+  High-impact mappings:
+  - `NVL(a,b)` → `COALESCE(a,b)`
+  - `DECODE(expr, a, b, c, d, ...)` → `CASE WHEN expr=a THEN b WHEN expr=c THEN d ... END`
+  - `SYSDATE` → `CURRENT_DATE`, `SYSTIMESTAMP` → `CURRENT_TIMESTAMP`
+  - `TO_DATE`, `TO_CHAR`, `TO_NUMBER` → use `to_date`, `date_format`, `CAST`
+  - `ROWNUM` → `LIMIT n` or `ROW_NUMBER() OVER()`
+  - `CONNECT BY` / hierarchical queries → recursive CTEs
+  - String concatenation (`||`) is supported directly
+  - `DUAL` table → `SELECT ...` without FROM
+
+  Datatypes:
+  - `VARCHAR2`, `CHAR`, `NCHAR` → `STRING`
+  - `NUMBER(p,s)` → `DECIMAL(p,s)`
+  - `DATE`, `TIMESTAMP` → `TIMESTAMP`
+  - `CLOB`/`BLOB` → `STRING`/`BINARY`
+  
+  Procedures & variables:
+  - Convert PL/SQL blocks to SQL Scripting
+  - Transform %TYPE and %ROWTYPE to explicit types
+  - Replace Oracle-specific functions with Spark SQL equivalents
+  - Convert cursor operations to appropriate result set handling
+
+mysql: |
+  High-impact mappings:
+  - `IFNULL(a,b)` → `COALESCE(a,b)`
+  - `STR_TO_DATE` → `to_date`
+  - `DATE_ADD(date, INTERVAL n unit)` → `date_add`/`timestampadd`
+  - `DATE_SUB` → `date_sub`
+  - `CONCAT_WS` → same in Databricks; `CONCAT` also supported
+  - `LIMIT n OFFSET m` → `LIMIT n OFFSET m` (supported in Databricks >=12.3)
+
+  Datatypes:
+  - `TINYINT(1)` (boolean) → `BOOLEAN`
+  - `TEXT`/`LONGTEXT` → `STRING`
+  - `DATETIME` → `TIMESTAMP`
+  - `DOUBLE`/`FLOAT` → `DOUBLE`
+
+postgresql: |
+  High-impact mappings:
+  - `NOW()` → `CURRENT_TIMESTAMP()`
+  - `STRING_AGG(expr, sep)` → `array_join(collect_list(expr), sep)`
+  - `BOOLEAN` type → `BOOLEAN` (supported)
+  - `ILIKE` → `LOWER(col) LIKE LOWER(pattern)`
+  - `SERIAL`/`BIGSERIAL` → `GENERATED ALWAYS AS IDENTITY`
+  - `DISTINCT ON (col)` → `ROW_NUMBER()` in subquery
+  - JSON operators (`->`, `->>`) → `get_json_object` / `from_json`
+
+  Datatypes:
+  - `VARCHAR`, `TEXT` → `STRING`
+  - `TIMESTAMP WITH TIME ZONE` → `TIMESTAMP`
+  - `UUID` → `STRING`
+  
+  Procedures & variables:
+  - Convert PL/pgSQL to SQL Scripting
+  - Transform PostgreSQL-specific data types
+  - Adapt array handling and custom types
+
+teradata: |
+  High-impact mappings:
+  - `CAST(x AS FORMAT ''...'')` → drop FORMAT, just `CAST(x AS type)`
+  - `TOP n` → `LIMIT n`
+  - `SAMPLE n` → `TABLESAMPLE(n rows)` or rewrite with `LIMIT`
+  - `QUALIFY` → supported in Databricks >= 12.3; otherwise rewrite with subquery and window function
+  - `ZEROIFNULL` → `COALESCE(x,0)`
+  - `OCCURS` → use `EXPLODE`/arrays
+  - `WITH RECURSIVE` → recursive CTEs
+
+  Datatypes:
+  - `BYTEINT` → `TINYINT`
+  - `DECIMAL(p,s)` → `DECIMAL(p,s)`
+  - `CHARACTER(n)` → `STRING`
+  
+  Procedures & variables:
+  - Convert SPL (Stored Procedure Language) to SQL Scripting
+  - Transform Teradata-specific data types (BYTEINT, etc.) to Spark SQL equivalents
+  - Replace Teradata system functions and variables (USER, DATABASE, etc.)
+  - Convert BTEQ-style commands and utilities
+  - Handle Teradata''s unique transaction and locking mechanisms
+  - Transform Teradata date/time functions to Spark SQL equivalents
+  - Convert Teradata statistical and analytical functions
+
+adf: |
+  Requirements:
+    - "You are a Databricks migration assistant. The input is ADF pipeline JSON (pipelines, activities, datasets, linked services, triggers)."
+    - "Focus on runnable, concise code. No prose, no markdown, no explanations."
+    - "Infer ADF parameters/variables and common constants (windowStart/windowEnd, paths, catalog/schema/table, thresholds, run_id)."
+    - "Create Databricks widgets for configurable inputs with realistic defaults. Never use placeholders like var1/defaultValue."
+    - "Replace secrets/credentials from linked services with secret lookups or widgets."
+    - "Translate sources/sinks: file ↔ file, JDBC, Delta tables, COPY INTO, Auto Loader when appropriate."
+    - "Map control flow: IfCondition/Switch/Until/ForEach → equivalent control in the selected mode."
+    - "Convert embedded SQL to Databricks SQL (IDENTIFIERS: remove double quotes; TYPES: NVARCHAR→STRING, NUMBER→DECIMAL/BIGINT; FUNCTIONS: GETDATE→CURRENT_TIMESTAMP, etc.)."
+    - "Every SQL statement must end with a semicolon."
+    - "Respect activity dependencies (`dependsOn`) and basic retries (mirror minimally if specified)."
+    - "Keep outputs small and runnable; exclude logging/audit frameworks unless explicitly present in the ADF."
+
+informatica: |
+  Requirements:
+  - Translate Informatica transformations into equivalent Databricks constructs:
+      - Source Qualifier → spark.read / Auto Loader / JDBC read
+      - Expression → withColumn / SQL projections
+      - Filter → WHERE clause or filter()
+      - Joiner → spark.sql JOIN or DataFrame join
+      - Aggregator → groupBy / agg
+      - Lookup → LEFT JOIN or broadcast join
+      - Update Strategy → MERGE INTO
+      - Sequence Generator → monotonically_increasing_id() or SQL sequence
+  - Use **widgets** for parameters (source/target paths, DB connections, dates).
+  - SQL inside `spark.sql(""" ... """)` must be Databricks SQL–compliant.
+
+ssis: |
+  Mapping guidelines:
+    - Control Flow:
+        - Sequence Containers → Python function wrappers
+        - ForEach Loop → Python for loops
+        - Precedence Constraints → if/else conditions
+        - Execute SQL Task → spark.sql("""...""")
+        - Data Flow Task → multiple notebook cells with Spark read/transform/write
+    - Data Flow Components:
+        - OLEDB/Flat File Source → spark.read.jdbc / spark.read.csv/parquet
+        - Derived Column → withColumn
+        - Conditional Split → when/otherwise
+        - Lookup → join/broadcast join
+        - Aggregate → groupBy/agg
+        - OLEDB Destination → write.format("delta").saveAsTable(...) or MERGE INTO
+    - Use widgets for configurable parameters (e.g., source/target connection strings, schema names, dates).
+      Example:
+        dbutils.widgets.text("target_table", "main.bronze.my_table")
+        tgt_tbl = dbutils.widgets.get("target_table")
+    - Connection Managers: replace sensitive info with dbutils.secrets.get(...)
+
+others: |
+  Guidelines:
+  - Use standard SQL constructs supported by Databricks.
+  - Default `NVL`/`IFNULL` → `COALESCE`
+  - Default string concat → `CONCAT` or `||`
+  - Default current date/time → `CURRENT_DATE`, `CURRENT_TIMESTAMP`
+  - Default limit → `LIMIT n`
+  - Unsupported vendor-specific syntax: remove or comment
+  - Map text datatypes → `STRING`, binary → `BINARY`, dates/times → `DATE`/`TIMESTAMP`

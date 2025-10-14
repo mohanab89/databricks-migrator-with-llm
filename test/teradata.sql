@@ -1,0 +1,5 @@
+-- /Workspace/Users/mohana.basak@databricks.com/useful/migration/databricks_migrator/src/notebooks/test_1/
+-- /Volumes/users/mohana_basak/mohana_test_vol/converter_input/teradata_mehran/
+-- users.mohana_basak.dbx_converter_results
+-- databricks-claude-3-7-sonnet
+-- teradata
