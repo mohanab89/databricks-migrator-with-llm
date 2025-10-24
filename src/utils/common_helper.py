@@ -24,13 +24,13 @@ for key, value in common_prompts.items():
         output_lang.extend(value.keys())
 output_lang_options = sorted(list(set(output_lang)), key=len, reverse=True)
 
-model_dict = {
-    "Claude 3.7": "databricks-claude-3-7-sonnet",
-    "Claude 4": "databricks-claude-sonnet-4",
-    "Claude 4.5": "databricks-claude-sonnet-4-5",
-    "Llama": "databricks-llama-4-maverick",
-    "Gemma": "databricks-gemma-3-12b",
-    "GPT": "databricks-gpt-oss-120b"}
+# model_dict = {
+#     "Claude 3.7": "databricks-claude-3-7-sonnet",
+#     "Claude 4": "databricks-claude-sonnet-4",
+#     "Claude 4.5": "databricks-claude-sonnet-4-5",
+#     "Llama": "databricks-llama-4-maverick",
+#     "Gemma": "databricks-gemma-3-12b",
+#     "GPT": "databricks-gpt-oss-120b"}
 model_max_tokens = {
     "databricks-claude-3-7-sonnet": 131072
 }
@@ -47,6 +47,19 @@ VIEW_TO_TABLE_REGEX = (
     r"(?i)\b(CREATE(?:\s+OR\s+REPLACE)?)\s+(?:TEMP|TEMPORARY)?\s*(VIEW|TABLE)\b"
 )
 VIEW_TO_TABLE_REPLACEMENT = r"$1 TABLE"
+
+
+def get_serving_endpoints(w):
+    model_dict = {}
+    serving_endponts = w.serving_endpoints.list()
+    for serving_endpont in serving_endponts:
+        if serving_endpont.config:
+            for served_entity in serving_endpont.config.served_entities:
+                if served_entity.foundation_model is not None:
+                    details = w.serving_endpoints.get(served_entity.name)
+                    if details.task.endswith('chat'):
+                        model_dict[served_entity.foundation_model.display_name] = served_entity.name
+    return model_dict
 
 
 def get_dynamic_partitions(row_count: int) -> int:
@@ -67,7 +80,8 @@ def get_dynamic_partitions(row_count: int) -> int:
         return min(base_partitions + additional_partitions, 400)
 
 
-def get_model_full_name(model_name):
+def get_model_full_name(w, model_name):
+    model_dict = get_serving_endpoints(w)
     return model_dict[model_name]
 
 

@@ -88,7 +88,7 @@ with interactive_tab:
     with col1:
         st.selectbox(
             "LLM Model",
-            list(common_helper.model_dict.keys()),
+            list(common_helper.get_serving_endpoints(w).keys()),
             index=0,
             key="llm_model_interactive",
             help="Choose the language model to use for the conversion."
@@ -150,7 +150,7 @@ with interactive_tab:
                 with st.spinner("Converting with AI…"):
                     try:
                         escaped_sql = dialect_input.replace("'", "''")
-                        model_full = common_helper.get_model_full_name(ss.llm_model_interactive)
+                        model_full = common_helper.get_model_full_name(w, ss.llm_model_interactive)
                         q = f"""
                         SELECT ai_query('{model_full}', {interactive_helper.prompt_to_convert_sql_with_ai_interactive(ss.dialect_interactive, escaped_sql, ss.llm_prompts_interactive, None)},
                              modelParameters => named_struct(
@@ -212,7 +212,7 @@ with batch_tab:
         with c1:
             st.selectbox(
                 "LLM Model",
-                list(common_helper.model_dict.keys()),
+                list(common_helper.get_serving_endpoints(w).keys()),
                 index=0,
                 key="llm_model_batch",
                 help="Choose the language model to use for the conversion."
@@ -404,7 +404,7 @@ with recon_tab:
         with c1:
             st.selectbox(
                 "LLM Model",
-                list(common_helper.model_dict.keys()),
+                list(common_helper.get_serving_endpoints(w).keys()),
                 index=0,
                 key="reconcile_llm_model",
                 help="Choose the language model to use for reconciliation."
@@ -519,4 +519,3 @@ with recon_tab:
                 st.rerun()
         else:
             st.info("ℹ️ Configure and start a new job in the Reconcile tab above.")
-
