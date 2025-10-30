@@ -91,7 +91,7 @@ def get_model_full_name(w, model_name):
 
 
 def get_model_params(model_name):
-    model_param = model_params[model_name]
+    model_param = model_params[model_name] if model_name in model_params else ''
     return model_param
 
 
