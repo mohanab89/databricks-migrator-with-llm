@@ -41,6 +41,17 @@ with c2:
 w = WorkspaceClient()
 cfg = Config()
 
+
+@st.cache_data(ttl=900, show_spinner=True)
+def get_serving_endpoints():
+    return common_helper.get_serving_endpoints(w)
+
+
+def get_model_full_name(model_name):
+    model_dict = get_serving_endpoints(w)
+    return model_dict[model_name]
+
+
 # ---------------------------------
 # Global session state defaults
 # ---------------------------------
@@ -88,7 +99,7 @@ with interactive_tab:
     with col1:
         st.selectbox(
             "LLM Model",
-            list(common_helper.get_serving_endpoints(w).keys()),
+            list(get_serving_endpoints().keys()),
             index=0,
             key="llm_model_interactive",
             help="Choose the language model to use for the conversion."
@@ -150,7 +161,7 @@ with interactive_tab:
                 with st.spinner("Converting with AI…"):
                     try:
                         escaped_sql = dialect_input.replace("'", "''")
-                        model_full = common_helper.get_model_full_name(w, ss.llm_model_interactive)
+                        model_full = get_model_full_name(ss.llm_model_interactive)
                         q = f"""
                         SELECT ai_query('{model_full}', {interactive_helper.prompt_to_convert_sql_with_ai_interactive(ss.dialect_interactive, escaped_sql, ss.llm_prompts_interactive, None)},
                              modelParameters => named_struct(
@@ -211,7 +222,7 @@ with batch_tab:
         with c1:
             st.selectbox(
                 "LLM Model",
-                list(common_helper.get_serving_endpoints(w).keys()),
+                list(get_serving_endpoints().keys()),
                 index=0,
                 key="llm_model_batch",
                 help="Choose the language model to use for the conversion."
@@ -298,7 +309,7 @@ with batch_tab:
                 try:
                     ss.update({"final_results_df": None, "results_written_path": None, "job_status": "SUBMITTING"})
                     ss.job_name = "Databricks Migrator Batch Conversion"
-                    job_id, run_id = batch_helper.trigger_job(ss.dialect_batch, input_folder, output_folder, ss.llm_model_batch, ss.validation_strategy_batch, results_table, ss.rerun_failures_batch, ss.llm_prompts_batch, w, ss.job_name, ss.nb_path_batch, ss.output_language, ss.output_mode)
+                    job_id, run_id = batch_helper.trigger_job(ss.dialect_batch, input_folder, output_folder, get_model_full_name(ss.llm_model_interactive), ss.validation_strategy_batch, results_table, ss.rerun_failures_batch, ss.llm_prompts_batch, w, ss.job_name, ss.nb_path_batch, ss.output_language, ss.output_mode)
                     ss.run_id = run_id
                     ss.job_id = job_id
                     st.rerun()
@@ -403,7 +414,7 @@ with recon_tab:
         with c1:
             st.selectbox(
                 "LLM Model",
-                list(common_helper.get_serving_endpoints(w).keys()),
+                list(get_serving_endpoints().keys()),
                 index=0,
                 key="reconcile_llm_model",
                 help="Choose the language model to use for reconciliation."
@@ -445,7 +456,7 @@ with recon_tab:
                 try:
                     ss.update({"recon_results_df": None, "recon_job_status": "SUBMITTING"})
                     ss.recon_job_name = "Databricks Migrator Batch Reconciliation"
-                    recon_job_id, recon_run_id = batch_helper.trigger_reconcile_job(ss.reconcile_llm_model, recon_results_table, recon_source_schema, recon_target_schema, w, ss.recon_job_name, ss.recon_nb_path)
+                    recon_job_id, recon_run_id = batch_helper.trigger_reconcile_job(get_model_full_name(ss.reconcile_llm_model), recon_results_table, recon_source_schema, recon_target_schema, w, ss.recon_job_name, ss.recon_nb_path)
                     ss.recon_run_id = recon_run_id
                     ss.recon_job_id = recon_job_id
                     st.rerun()

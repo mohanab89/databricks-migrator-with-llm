@@ -48,7 +48,7 @@ def trigger_job(dialect_batch, input_folder, output_folder, llm_model_batch, val
         "SOURCE_DIALECT": dialect_batch,
         "INPUT_FOLDER": input_folder,
         "DATABRICKS_OUTPUT_FOLDER": output_folder,
-        "MODEL_NAME": common_helper.get_model_full_name(w, llm_model_batch),
+        "MODEL_NAME": llm_model_batch,
         "VALIDATE_RESULTS": "No" if validation_strategy_batch == "No Validation" else "Yes",
         "RESULTS_TABLE_NAME": results_table,
         "MAX_RERUN_COUNT": rerun_failures_batch,
@@ -65,7 +65,7 @@ def trigger_job(dialect_batch, input_folder, output_folder, llm_model_batch, val
             "SOURCE_DIALECT": "",
             "INPUT_FOLDER": "/Volumes/users/user_name/volume_name/converter_input/",
             "DATABRICKS_OUTPUT_FOLDER": "/Workspaces/Users/user_name/databricks-migrator-with-llm/converter_output/",
-            "MODEL_NAME": common_helper.get_model_full_name(w, "Claude Sonnet 4.5"),
+            "MODEL_NAME": llm_model_batch,
             "VALIDATE_RESULTS": "Yes",
             "RESULTS_TABLE_NAME": "main.default.dbx_converter_results",
             "RERUN_FOR_FAILURES": "1",
@@ -102,7 +102,7 @@ def trigger_job(dialect_batch, input_folder, output_folder, llm_model_batch, val
 def trigger_reconcile_job(llm_model_batch, results_table, src_schema, tgt_schema, w, job_name, nb_path_batch):
     batch_params = {
         "RECONCILE_RESULTS_TABLE_NAME": results_table,
-        "MODEL_NAME": common_helper.get_model_full_name(w, llm_model_batch),
+        "MODEL_NAME": llm_model_batch,
         "strSRCDB": src_schema,
         "strTGTDB": tgt_schema
     }
@@ -113,7 +113,7 @@ def trigger_reconcile_job(llm_model_batch, results_table, src_schema, tgt_schema
     if not job:
         default_params = {
             "RECONCILE_RESULTS_TABLE_NAME": "main.default.reconcile_results",
-            "MODEL_NAME": common_helper.get_model_full_name(w, "Claude Sonnet 4.5"),
+            "MODEL_NAME": llm_model_batch,
             "strSRCDB": "src.default",
             "strTGTDB": "tgt.default"
         }

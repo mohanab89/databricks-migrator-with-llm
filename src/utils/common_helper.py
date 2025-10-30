@@ -86,11 +86,6 @@ def get_dynamic_partitions(row_count: int) -> int:
         return min(base_partitions + additional_partitions, 400)
 
 
-def get_model_full_name(w, model_name):
-    model_dict = get_serving_endpoints(w)
-    return model_dict[model_name]
-
-
 def get_model_params(model_name):
     model_param = model_params[model_name] if model_name in model_params else ''
     return model_param
