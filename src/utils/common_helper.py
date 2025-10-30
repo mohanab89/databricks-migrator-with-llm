@@ -38,6 +38,7 @@ model_params = {
     "databricks-llama-4-maverick": "'temperature', 0.0",
     "databricks-gemma-3-12b": "'temperature', 0.0",
     "databricks-gpt-oss-120b": "'temperature', 0.0",
+    "databricks-gpt-5": "'temperature', 1"
 }
 
 workflow_schema = "STRUCT<workflow_name: STRING, tasks: ARRAY<STRUCT<task_name: STRING, filename: STRING, depends_on: ARRAY<STRING>, notebook_language: STRING, parameters: ARRAY<STRUCT<name: STRING, default: STRING>>, content: STRING>>>"
