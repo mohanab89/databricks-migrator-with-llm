@@ -48,7 +48,7 @@ def get_serving_endpoints():
 
 
 def get_model_full_name(model_name):
-    model_dict = get_serving_endpoints(w)
+    model_dict = get_serving_endpoints()
     return model_dict[model_name]
 
 
