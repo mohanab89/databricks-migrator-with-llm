@@ -155,8 +155,8 @@ while attempt <= MAX_RERUN_COUNT and input_df_count > 0:
     input_df = input_df.repartition(common_helper.get_dynamic_partitions(input_df_count))
 
     # Convert using LLM
-    converted_sql_df = input_df.filter(col("row_type") == "sql_script").selectExpr("input_file", "input_sql", "row_type", "position", f"ai_query('{MODEL_NAME}', {batch_helper.prompt_to_convert_sql_with_ai_batch(SOURCE_DIALECT, ADDITIONAL_PROMPTS, is_rerun, OUTPUT_MODE, OUTPUT_LANG, 'sql_script')}, modelParameters => named_struct('temperature', 0.0{common_helper.get_model_max_tokens(MODEL_NAME)})) as databricks_sql")
-    converted_nonsql_df = input_df.filter(col("row_type") != "sql_script").selectExpr("input_file", "input_sql", "row_type", "position", f"ai_query('{MODEL_NAME}', {batch_helper.prompt_to_convert_sql_with_ai_batch(SOURCE_DIALECT, ADDITIONAL_PROMPTS, is_rerun, OUTPUT_MODE, OUTPUT_LANG, 'procedure')}, modelParameters => named_struct('temperature', 0.0{common_helper.get_model_max_tokens(MODEL_NAME)})) as databricks_sql")
+    converted_sql_df = input_df.filter(col("row_type") == "sql_script").selectExpr("input_file", "input_sql", "row_type", "position", f"ai_query('{MODEL_NAME}', {batch_helper.prompt_to_convert_sql_with_ai_batch(SOURCE_DIALECT, ADDITIONAL_PROMPTS, is_rerun, OUTPUT_MODE, OUTPUT_LANG, 'sql_script')}, modelParameters => named_struct({common_helper.get_model_params(MODEL_NAME)})) as databricks_sql")
+    converted_nonsql_df = input_df.filter(col("row_type") != "sql_script").selectExpr("input_file", "input_sql", "row_type", "position", f"ai_query('{MODEL_NAME}', {batch_helper.prompt_to_convert_sql_with_ai_batch(SOURCE_DIALECT, ADDITIONAL_PROMPTS, is_rerun, OUTPUT_MODE, OUTPUT_LANG, 'procedure')}, modelParameters => named_struct({common_helper.get_model_params(MODEL_NAME)})) as databricks_sql")
     converted_df = converted_sql_df.union(converted_nonsql_df)
     if OUTPUT_LANG.lower() == 'sql':
         converted_df = (

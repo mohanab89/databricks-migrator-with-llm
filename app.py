@@ -154,8 +154,7 @@ with interactive_tab:
                         q = f"""
                         SELECT ai_query('{model_full}', {interactive_helper.prompt_to_convert_sql_with_ai_interactive(ss.dialect_interactive, escaped_sql, ss.llm_prompts_interactive, None)},
                              modelParameters => named_struct(
-                                'temperature', 0.0
-                                {common_helper.get_model_max_tokens(model_full)}
+                                {common_helper.get_model_params(model_full)}
                                 )) AS databricks_sql
                         """
                         df = interactive_helper.execute_sql(cfg, q, ss.warehouse_id)

@@ -90,8 +90,7 @@ def regenerate_with_err_context(validation_result, llm_model_interactive, dialec
     q = f"""
         SELECT ai_query('{model_full}', {prompt_to_convert_sql_with_ai_interactive(dialect_interactive, esc, llm_prompts_interactive, err)},
          modelParameters => named_struct(
-            'temperature', 0.0
-            {common_helper.get_model_max_tokens(model_full)}
+            {common_helper.get_model_params(model_full)}
             )) AS databricks_sql
         """
     df = execute_sql(cfg, q, warehouse_id)

@@ -31,8 +31,13 @@ output_lang_options = sorted(list(set(output_lang)), key=len, reverse=True)
 #     "Llama": "databricks-llama-4-maverick",
 #     "Gemma": "databricks-gemma-3-12b",
 #     "GPT": "databricks-gpt-oss-120b"}
-model_max_tokens = {
-    "databricks-claude-3-7-sonnet": 131072
+model_params = {
+    "databricks-claude-3-7-sonnet": "'temperature', 0.0, 'max_tokens', 131072",
+    "databricks-claude-sonnet-4": "'temperature', 0.0",
+    "databricks-claude-sonnet-4-5": "'temperature', 0.0",
+    "databricks-llama-4-maverick": "'temperature', 0.0",
+    "databricks-gemma-3-12b": "'temperature', 0.0",
+    "databricks-gpt-oss-120b": "'temperature', 0.0",
 }
 
 workflow_schema = "STRUCT<workflow_name: STRING, tasks: ARRAY<STRUCT<task_name: STRING, filename: STRING, depends_on: ARRAY<STRING>, notebook_language: STRING, parameters: ARRAY<STRUCT<name: STRING, default: STRING>>, content: STRING>>>"
@@ -85,9 +90,9 @@ def get_model_full_name(w, model_name):
     return model_dict[model_name]
 
 
-def get_model_max_tokens(model_name):
-    max_tokens = f", 'max_tokens', {model_max_tokens[model_name]}" if model_name in model_max_tokens else ''
-    return max_tokens
+def get_model_params(model_name):
+    model_param = model_params[model_name]
+    return model_param
 
 
 def get_sql_warehouses(w):

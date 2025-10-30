@@ -140,8 +140,7 @@ my_ai_validation_df = spark.sql(f"""
         '- validation_result: If ' || status || ' equals MISMATCH show a detail descriptive difference of report summary from comparing' || src_concatenated_columns || ' and ' || tgt_concatenated_columns || ' describe which records or columns were different otherwise show NA. Make sure to always show the JSON output summary as JSON.'
         ,
         modelParameters => named_struct(
-            'temperature', 0.0
-            {common_helper.get_model_max_tokens(MODEL_NAME)}
+            {common_helper.get_model_params(MODEL_NAME)}
         )
     ) AS validation_result
 FROM mismatch_df
