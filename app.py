@@ -136,7 +136,7 @@ with interactive_tab:
 
     # Service Principal Note
     sp_id = os.getenv('DATABRICKS_CLIENT_ID')
-    st.info(f"ℹ️ **Note:** This app's service principal will need access to the selected warehouse to successfully execute queries. SP ID: {sp_id}.")
+    st.info(f"ℹ️ **Note:** This app's service principal will need access to the selected warehouse to successfully execute queries. SP ID: {sp_id}")
 
     st.divider()
 
