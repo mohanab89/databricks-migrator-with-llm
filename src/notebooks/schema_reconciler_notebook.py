@@ -23,6 +23,10 @@ tgt_db = dbutils.widgets.get("strTGTDB")
 MODEL_NAME = dbutils.widgets.get("MODEL_NAME")
 RESULTS_TABLE_NAME = dbutils.widgets.get("RECONCILE_RESULTS_TABLE_NAME")
 
+# Create backticked version for tables with special characters in catalog/schema names
+table_parts = RESULTS_TABLE_NAME.split('.')
+RESULTS_TABLE_NAME_QUOTED = f"`{table_parts[0]}`.`{table_parts[1]}`.`{table_parts[2]}`"
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -41,7 +45,7 @@ RESULTS_TABLE_NAME = dbutils.widgets.get("RECONCILE_RESULTS_TABLE_NAME")
 # COMMAND ----------
 
 spark.sql(f"""
-          CREATE TABLE IF NOT EXISTS {RESULTS_TABLE_NAME} (    
+          CREATE TABLE IF NOT EXISTS {RESULTS_TABLE_NAME_QUOTED} (    
               query_id BIGINT GENERATED ALWAYS AS IDENTITY,
               table_Name STRING,
               status STRING,
@@ -161,7 +165,7 @@ my_ai_validation_df.createOrReplaceTempView("my_ai_validation_df")
 # COMMAND ----------
 
 ai_validation_report_df = spark.sql(f"""
-INSERT INTO {RESULTS_TABLE_NAME} (table_Name, status, source_row_count, target_row_count, validation_result_analysis)
+INSERT INTO {RESULTS_TABLE_NAME_QUOTED} (table_Name, status, source_row_count, target_row_count, validation_result_analysis)
 SELECT table_Name,
     status,
     src_count,
@@ -176,7 +180,7 @@ written_df = spark.sql(f"""
 SELECT table_Name,source_row_count, target_row_count, variant_get(validation_result_analysis, '$.validation_result', 'string') as validation_report, created_at
 FROM (
     SELECT *, ROW_NUMBER() OVER (PARTITION BY Table_Name ORDER BY query_id DESC) AS rn
-    FROM {RESULTS_TABLE_NAME}
+    FROM {RESULTS_TABLE_NAME_QUOTED}
 ) subquery
 WHERE rn = 1
 """)

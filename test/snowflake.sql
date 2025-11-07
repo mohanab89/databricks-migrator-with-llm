@@ -165,6 +165,42 @@ AS (
 /****************************************************************************************************************************
 ****************************************************************************************************************************/
 
+-- Complex Snowflake query with PIVOT, LATERAL FLATTEN, and dynamic columns
+WITH sales_data AS (
+    SELECT
+        d.value:customer_id::VARCHAR AS customer_id,
+        d.value:product_name::VARCHAR AS product_name,
+        d.value:region::VARCHAR AS region,
+        d.value:amount::DECIMAL(10,2) AS amount,
+        TO_TIMESTAMP_LTZ(d.value:sale_date::VARCHAR) AS sale_date
+    FROM my_db.my_schema.raw_sales,
+    LATERAL FLATTEN(input => json_data) d
+    WHERE d.value:status = 'completed'
+),
+regional_sales AS (
+    SELECT
+        customer_id,
+        product_name,
+        region,
+        SUM(amount) as total_amount,
+        COUNT(*) as transaction_count,
+        LISTAGG(DISTINCT sale_date::DATE, ', ') WITHIN GROUP (ORDER BY sale_date) as sale_dates
+    FROM sales_data
+    WHERE sale_date >= DATEADD(month, -6, CURRENT_DATE())
+    GROUP BY customer_id, product_name, region
+)
+SELECT * FROM regional_sales
+PIVOT (
+    SUM(total_amount) as total,
+    AVG(total_amount) as avg,
+    MAX(transaction_count) as max_txn
+    FOR region IN ('North America', 'Europe', 'Asia Pacific', 'Latin America')
+)
+ORDER BY customer_id;
+
+/****************************************************************************************************************************
+****************************************************************************************************************************/
+
 -- /Workspace/Users/mohana.basak@databricks.com/useful/migration/databricks_migrator/src/notebooks/batch_converter_notebook
 -- /Volumes/users/mohana_basak/mohana_test_vol/converter_input/input_dir_suraj/
 -- /Volumes/users/mohana_basak/mohana_test_vol/converter_output/test_1/

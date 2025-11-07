@@ -45,6 +45,10 @@ DATABRICKS_OUTPUT_FOLDER = dbutils.widgets.get("DATABRICKS_OUTPUT_FOLDER")
 # The folder where the conversion results will be saved.
 RESULTS_TABLE_NAME = dbutils.widgets.get("RESULTS_TABLE_NAME")
 
+# Create backticked version for tables with special characters in catalog/schema names
+table_parts = RESULTS_TABLE_NAME.split('.')
+RESULTS_TABLE_NAME_QUOTED = f"`{table_parts[0]}`.`{table_parts[1]}`.`{table_parts[2]}`"
+
 # The source input dialect.
 SOURCE_DIALECT = dbutils.widgets.get("SOURCE_DIALECT")
 
@@ -251,11 +255,11 @@ final_df = retried_validated_df.withColumn("converted_at", current_timestamp()) 
 
 # display(final_df)
 # Append the final output into the results table
-final_df.write.mode('append').saveAsTable(RESULTS_TABLE_NAME)
+final_df.write.mode('append').saveAsTable(RESULTS_TABLE_NAME_QUOTED)
 
 # COMMAND ----------
 
-written_df = spark.sql(f"select * from {RESULTS_TABLE_NAME} where version_id = '{run_id}'")
+written_df = spark.sql(f"select * from {RESULTS_TABLE_NAME_QUOTED} where version_id = '{run_id}'")
 display(written_df)
 
 # COMMAND ----------
@@ -321,7 +325,7 @@ SELECT
     WHEN SUM(CASE WHEN validation_result = 'FAILURE' THEN 1 ELSE 0 END) > 0
     THEN 'FAILURE' ELSE 'SUCCESS'
   END AS validation_result
-FROM {RESULTS_TABLE_NAME}
+FROM {RESULTS_TABLE_NAME_QUOTED}
 where
     version_id = '{run_id}'
 GROUP BY input_file;
