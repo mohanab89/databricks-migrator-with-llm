@@ -314,7 +314,11 @@ with batch_tab:
             help="An optional space to provide specific rules to guide the LLM."
         )
 
-        st.warning(f"⚠️ **IMPORTANT:** The service principal must have `READ/WRITE` permission on input/output folders and the results table.\n\n**Service Principal ID:** `{sp_id}`")
+        st.warning(f"⚠️ **IMPORTANT:** The service principal needs:\n"
+                   f"- `READ` permission on input folders\n"
+                   f"- `WRITE` permission on output folders\n"
+                   f"- `CREATE TABLE` permission on the results table schema (auto-created on first run)\n\n"
+                   f"**Service Principal ID:** `{sp_id}`")
         submitted = st.form_submit_button("Start Batch Conversion Job", type="primary", use_container_width=True)
 
     if submitted:
@@ -463,7 +467,10 @@ with recon_tab:
                     help="The full path to the reconciliation notebook."
                 )
 
-        st.warning(f"⚠️ **IMPORTANT:** The service principal must have `SELECT` permission on source and target schemas.\n\n**Service Principal ID:** `{sp_id}`")
+        st.warning(f"⚠️ **IMPORTANT:** The service principal needs:\n"
+                   f"- `SELECT` permission on source and target schemas\n"
+                   f"- `CREATE TABLE` permission on the results table schema (auto-created on first run)\n\n"
+                   f"**Service Principal ID:** `{sp_id}`")
         reconcile_submitted = st.form_submit_button("Start Reconciliation Job", type="primary", use_container_width=True)
 
     if reconcile_submitted:
