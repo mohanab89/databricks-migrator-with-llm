@@ -56,6 +56,22 @@ def get_warehouses():
     return common_helper.get_sql_warehouses(w)
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_notebook_path(notebook_name: str):
+    """
+    Get notebook path with 1-hour cache to avoid repeated API calls.
+    """
+    return common_helper.get_notebook_path(w, 'databricks-migrator', notebook_name)
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def get_sorted_models():
+    """
+    Get sorted model list with 15-minute cache.
+    """
+    return common_helper.get_sorted_models(w)
+
+
 # ---------------------------------
 # Global session state defaults
 # ---------------------------------
@@ -74,10 +90,10 @@ ss.setdefault("job_status", "Not Started")
 ss.setdefault("final_results_df", None)
 ss.setdefault("results_written_path", None)
 ss.setdefault("job_error_message", None)
-ss.setdefault("nb_path_batch", common_helper.get_notebook_path(w, 'databricks-migrator', 'batch_converter_notebook'))
+ss.setdefault("nb_path_batch", get_notebook_path('batch_converter_notebook'))
 
 # Reconcile tab state
-ss.setdefault("recon_nb_path", common_helper.get_notebook_path(w, 'databricks-migrator', 'schema_reconciler_notebook'))
+ss.setdefault("recon_nb_path", get_notebook_path('schema_reconciler_notebook'))
 ss.setdefault("recon_run_id", None)
 ss.setdefault("recon_job_id", None)
 ss.setdefault("recon_job_name", None)
@@ -103,7 +119,7 @@ with interactive_tab:
     with col1:
         st.selectbox(
             "LLM Model",
-            common_helper.get_sorted_models(w),
+            get_sorted_models(),
             index=0,
             key="llm_model_interactive",
             help="Choose the language model to use for the conversion. Claude and GPT models are recommended for code migration."
@@ -240,7 +256,7 @@ with batch_tab:
         with c1:
             st.selectbox(
                 "LLM Model",
-                common_helper.get_sorted_models(w),
+                get_sorted_models(),
                 index=0,
                 key="llm_model_batch",
                 help="Choose the language model to use for the conversion. Claude and GPT models are recommended for code migration."
@@ -489,7 +505,7 @@ with recon_tab:
         with c1:
             st.selectbox(
                 "LLM Model",
-                common_helper.get_sorted_models(w),
+                get_sorted_models(),
                 index=0,
                 key="reconcile_llm_model",
                 help="Choose the language model to use for reconciliation. Claude and GPT models are recommended."
