@@ -88,6 +88,34 @@ print(run_id)
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ### Ensure catalog and schema exist for results table
+
+# COMMAND ----------
+
+# Extract catalog and schema from results table name (format: catalog.schema.table)
+table_parts = RESULTS_TABLE_NAME.split('.')
+if len(table_parts) == 3:
+    catalog_name = table_parts[0]
+    schema_name = table_parts[1]
+    
+    # Create catalog if not exists
+    spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog_name}")
+    print(f"Catalog '{catalog_name}' is ready")
+    
+    # Create schema if not exists
+    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog_name}.{schema_name}")
+    print(f"Schema '{catalog_name}.{schema_name}' is ready")
+elif len(table_parts) == 2:
+    # Two-part name (schema.table) - use current catalog
+    schema_name = table_parts[0]
+    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
+    print(f"Schema '{schema_name}' is ready")
+else:
+    print(f"Using table name as-is: {RESULTS_TABLE_NAME}")
+
+# COMMAND ----------
+
 print("--- Starting Legacy SQL to Databricks SQL Conversion Process ---")
 
 # Check if the input directory exists

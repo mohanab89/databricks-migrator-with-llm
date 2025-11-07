@@ -317,6 +317,7 @@ with batch_tab:
         st.warning(f"⚠️ **IMPORTANT:** The service principal needs:\n"
                    f"- `READ` permission on input folders\n"
                    f"- `WRITE` permission on output folders\n"
+                   f"- `CREATE CATALOG` and `CREATE SCHEMA` permissions (catalog/schema auto-created if missing)\n"
                    f"- `CREATE TABLE` permission on the results table schema (auto-created on first run)\n\n"
                    f"**Service Principal ID:** `{sp_id}`")
         submitted = st.form_submit_button("Start Batch Conversion Job", type="primary", use_container_width=True)
@@ -377,7 +378,10 @@ with batch_tab:
                     "job_error_message": None,
                     "run_id": None,
                     "final_results_df": results_df[["input_file", "databricks_sql", "validation_result"]],
-                    "results_written_path": results_written_path_url
+                    "results_written_path": results_written_path_url,
+                    "completed_job_url": ss.run_page_url,  # Keep the job URL
+                    "completed_job_id": ss.job_id,
+                    "completed_run_id": run_info.run_id
                 })
                 st.rerun()
             elif ss.job_status == RunLifeCycleState.TERMINATED:
@@ -385,7 +389,8 @@ with batch_tab:
                     "job_error_message": f"Job terminated: {run_info.state.result_state.value}. Reason: {run_info.state.state_message}",
                     "run_id": None,
                     "final_results_df": None,
-                    "results_written_path": None
+                    "results_written_path": None,
+                    "completed_job_url": None
                 })
                 st.rerun()
             elif ss.job_status in [RunLifeCycleState.INTERNAL_ERROR, RunLifeCycleState.SKIPPED]:
@@ -410,7 +415,20 @@ with batch_tab:
                 ss.update({"job_error_message": None, "final_results_df": None, "results_written_path": None})
                 st.rerun()
         elif ss.final_results_df is not None:
-            st.header("✅ Results from Last Completed Job (max 20 rows)")
+            st.header("✅ Results from Last Completed Job")
+            
+            # Display job information
+            if ss.get("completed_job_url"):
+                with st.container(border=True):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if ss.get("completed_job_id"):
+                            st.markdown(f"**Job ID:** `{ss.completed_job_id}`")
+                        if ss.get("completed_run_id"):
+                            st.markdown(f"**Run ID:** `{ss.completed_run_id}`")
+                    with col2:
+                        st.markdown(f"**Job Run:** [Open in Databricks]({ss.completed_job_url}) 🔗")
+            
             st.dataframe(ss.final_results_df, use_container_width=True)
             if ss.results_written_path is not None:
                 st.markdown(
@@ -419,7 +437,14 @@ with batch_tab:
                 )
 
             if st.button("Start New Batch", key="btn_new_batch"):
-                ss.update({"job_error_message": None, "final_results_df": None, "results_written_path": None})
+                ss.update({
+                    "job_error_message": None, 
+                    "final_results_df": None, 
+                    "results_written_path": None,
+                    "completed_job_url": None,
+                    "completed_job_id": None,
+                    "completed_run_id": None
+                })
                 st.rerun()
         else:
             st.info("ℹ️ Configure and start a new job in the Batch tab above.")
@@ -469,6 +494,7 @@ with recon_tab:
 
         st.warning(f"⚠️ **IMPORTANT:** The service principal needs:\n"
                    f"- `SELECT` permission on source and target schemas\n"
+                   f"- `CREATE CATALOG` and `CREATE SCHEMA` permissions (catalog/schema auto-created if missing)\n"
                    f"- `CREATE TABLE` permission on the results table schema (auto-created on first run)\n\n"
                    f"**Service Principal ID:** `{sp_id}`")
         reconcile_submitted = st.form_submit_button("Start Reconciliation Job", type="primary", use_container_width=True)
@@ -517,6 +543,9 @@ with recon_tab:
                     "recon_error": None,
                     "recon_run_id": None,
                     "recon_results_df": recon_results_df[["table_name", "source_row_count", "target_row_count", "validation_report"]],
+                    "recon_completed_job_url": ss.recon_run_page_url,  # Keep the job URL
+                    "recon_completed_job_id": ss.recon_job_id,
+                    "recon_completed_run_id": recon_run_info.run_id
                 })
                 st.rerun()
             elif ss.recon_job_status == RunLifeCycleState.TERMINATED:
@@ -524,6 +553,7 @@ with recon_tab:
                     "recon_error": f"Job terminated: {recon_run_info.state.result_state.value}. Reason: {recon_run_info.state.state_message}",
                     "recon_run_id": None,
                     "recon_results_df": None,
+                    "recon_completed_job_url": None
                 })
                 st.rerun()
             elif ss.recon_job_status in [RunLifeCycleState.INTERNAL_ERROR, RunLifeCycleState.SKIPPED]:
@@ -548,9 +578,28 @@ with recon_tab:
                 st.rerun()
         elif ss.recon_results_df is not None:
             st.header("✅ Results from Last Completed Job")
+            
+            # Display job information
+            if ss.get("recon_completed_job_url"):
+                with st.container(border=True):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if ss.get("recon_completed_job_id"):
+                            st.markdown(f"**Job ID:** `{ss.recon_completed_job_id}`")
+                        if ss.get("recon_completed_run_id"):
+                            st.markdown(f"**Run ID:** `{ss.recon_completed_run_id}`")
+                    with col2:
+                        st.markdown(f"**Job Run:** [Open in Databricks]({ss.recon_completed_job_url}) 🔗")
+            
             st.dataframe(ss.recon_results_df, use_container_width=True)
             if st.button("Start New Batch", key="recon_btn_new_batch"):
-                ss.update({"recon_error": None, "recon_results_df": None})
+                ss.update({
+                    "recon_error": None, 
+                    "recon_results_df": None,
+                    "recon_completed_job_url": None,
+                    "recon_completed_job_id": None,
+                    "recon_completed_run_id": None
+                })
                 st.rerun()
         else:
             st.info("ℹ️ Configure and start a new job in the Reconcile tab above.")
