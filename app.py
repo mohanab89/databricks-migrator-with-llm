@@ -315,7 +315,7 @@ with batch_tab:
         )
 
         st.warning(f"⚠️ **IMPORTANT Prerequisites:**\n"
-                   f"1. **Pre-create** the catalog and schema for the results table (e.g., `main.migration`)\n"
+                   f"1. **Pre-create** the catalog and schema for the results table (e.g., `main.default`)\n"
                    f"2. Grant the service principal:\n"
                    f"   - `READ` permission on input folders\n"
                    f"   - `WRITE` permission on output folders\n"
@@ -519,7 +519,7 @@ with recon_tab:
                 )
 
         st.warning(f"⚠️ **IMPORTANT Prerequisites:**\n"
-                   f"1. **Pre-create** the catalog and schema for the results table (e.g., `main.reconciliation`)\n"
+                   f"1. **Pre-create** the catalog and schema for the results table (e.g., `main.default`)\n"
                    f"2. Grant the service principal:\n"
                    f"   - `SELECT` permission on source and target schemas\n"
                    f"   - `CREATE TABLE` permission on the results table schema\n\n"
