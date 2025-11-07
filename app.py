@@ -314,11 +314,12 @@ with batch_tab:
             help="An optional space to provide specific rules to guide the LLM."
         )
 
-        st.warning(f"⚠️ **IMPORTANT:** The service principal needs:\n"
-                   f"- `READ` permission on input folders\n"
-                   f"- `WRITE` permission on output folders\n"
-                   f"- `CREATE CATALOG` and `CREATE SCHEMA` permissions (catalog/schema auto-created if missing)\n"
-                   f"- `CREATE TABLE` permission on the results table schema (auto-created on first run)\n\n"
+        st.warning(f"⚠️ **IMPORTANT Prerequisites:**\n"
+                   f"1. **Pre-create** the catalog and schema for the results table (e.g., `main.migration`)\n"
+                   f"2. Grant the service principal:\n"
+                   f"   - `READ` permission on input folders\n"
+                   f"   - `WRITE` permission on output folders\n"
+                   f"   - `CREATE TABLE` permission on the results table schema\n\n"
                    f"**Service Principal ID:** `{sp_id}`")
         submitted = st.form_submit_button("Start Batch Conversion Job", type="primary", use_container_width=True)
 
@@ -517,10 +518,11 @@ with recon_tab:
                     help="The full path to the reconciliation notebook."
                 )
 
-        st.warning(f"⚠️ **IMPORTANT:** The service principal needs:\n"
-                   f"- `SELECT` permission on source and target schemas\n"
-                   f"- `CREATE CATALOG` and `CREATE SCHEMA` permissions (catalog/schema auto-created if missing)\n"
-                   f"- `CREATE TABLE` permission on the results table schema (auto-created on first run)\n\n"
+        st.warning(f"⚠️ **IMPORTANT Prerequisites:**\n"
+                   f"1. **Pre-create** the catalog and schema for the results table (e.g., `main.reconciliation`)\n"
+                   f"2. Grant the service principal:\n"
+                   f"   - `SELECT` permission on source and target schemas\n"
+                   f"   - `CREATE TABLE` permission on the results table schema\n\n"
                    f"**Service Principal ID:** `{sp_id}`")
         reconcile_submitted = st.form_submit_button("Start Reconciliation Job", type="primary", use_container_width=True)
 

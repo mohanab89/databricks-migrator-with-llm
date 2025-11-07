@@ -26,30 +26,132 @@ RESULTS_TABLE_NAME = dbutils.widgets.get("RECONCILE_RESULTS_TABLE_NAME")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Ensure catalog and schema exist for results table
+# MAGIC ### Prerequisites Check and Validation
+# MAGIC **IMPORTANT:** This cell validates that either:
+# MAGIC 1. The results table already exists and is writable, OR
+# MAGIC 2. The service principal has permission to create the table
+# MAGIC 
+# MAGIC The job will fail fast with a clear error if prerequisites are not met.
 
 # COMMAND ----------
 
-# Extract catalog and schema from results table name (format: catalog.schema.table)
+# Validate results table name format - must be 3-part name: catalog.schema.table
 table_parts = RESULTS_TABLE_NAME.split('.')
-if len(table_parts) == 3:
-    catalog_name = table_parts[0]
-    schema_name = table_parts[1]
+if len(table_parts) != 3:
+    error_msg = f"""
+    ❌ INVALID TABLE NAME FORMAT ❌
     
-    # Create catalog if not exists
-    spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog_name}")
-    print(f"Catalog '{catalog_name}' is ready")
+    Results table: {RESULTS_TABLE_NAME}
     
-    # Create schema if not exists
-    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog_name}.{schema_name}")
-    print(f"Schema '{catalog_name}.{schema_name}' is ready")
-elif len(table_parts) == 2:
-    # Two-part name (schema.table) - use current catalog
-    schema_name = table_parts[0]
-    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
-    print(f"Schema '{schema_name}' is ready")
-else:
-    print(f"Using table name as-is: {RESULTS_TABLE_NAME}")
+    ERROR: Table name must be in 3-part format: catalog.schema.table
+    
+    Example: main.default.reconciliation_results
+    
+    Job cannot proceed with invalid table name.
+    """
+    print(error_msg)
+    raise ValueError(error_msg)
+
+catalog_name, schema_name, table_name = table_parts
+schema_full_name = f"{catalog_name}.{schema_name}"
+
+print(f"Validating results table: {RESULTS_TABLE_NAME}")
+print(f"  - Catalog: {catalog_name}")
+print(f"  - Schema: {schema_name}")
+print(f"  - Table: {table_name}")
+
+# Check if table exists or can be created
+validation_passed = False
+error_message = None
+
+try:
+    # First, check if table already exists
+    existing_tables = spark.sql(f"SHOW TABLES IN {schema_full_name}").collect()
+    table_exists = any(row.tableName == table_name for row in existing_tables)
+    
+    if table_exists:
+        # Table exists - check MODIFY permission via SHOW GRANTS
+        print(f"✓ Table {RESULTS_TABLE_NAME} already exists")
+        print("  Checking MODIFY permission on table...")
+        
+        try:
+            grants = spark.sql(f"SHOW GRANTS ON TABLE {RESULTS_TABLE_NAME}").collect()
+            has_modify_permission = False
+            
+            for grant in grants:
+                if hasattr(grant, 'ActionType'):
+                    action = grant.ActionType.upper()
+                    # Check for MODIFY, INSERT, ALL PRIVILEGES, or OWNER
+                    if any(perm in action for perm in ['MODIFY', 'INSERT', 'ALL PRIVILEGES', 'OWNER']):
+                        print(f"  ✓ Found permission: {action}")
+                        has_modify_permission = True
+                        break
+            
+            if has_modify_permission:
+                print("  ✓ Table is writable - MODIFY/INSERT permission verified")
+                validation_passed = True
+            else:
+                error_message = "No MODIFY or INSERT permission found on existing table"
+                print(f"  ❌ {error_message}")
+        except Exception as grant_error:
+            error_message = f"Cannot check grants on table: {str(grant_error)}"
+            print(f"  ❌ {error_message}")
+    else:
+        # Table doesn't exist - check CREATE TABLE permission via SHOW GRANTS
+        print(f"⚠ Table {RESULTS_TABLE_NAME} does not exist yet")
+        print("  Checking CREATE TABLE permission on schema...")
+        
+        try:
+            grants = spark.sql(f"SHOW GRANTS ON SCHEMA {schema_full_name}").collect()
+            has_create_permission = False
+            
+            for grant in grants:
+                if hasattr(grant, 'ActionType'):
+                    action = grant.ActionType.upper()
+                    # Check for CREATE TABLE, CREATE, ALL PRIVILEGES, or OWNER
+                    if any(perm in action for perm in ['CREATE', 'ALL PRIVILEGES', 'OWNER']):
+                        print(f"  ✓ Found permission: {action}")
+                        has_create_permission = True
+                        break
+            
+            if has_create_permission:
+                print("  ✓ CREATE TABLE permission verified on schema")
+                validation_passed = True
+            else:
+                error_message = f"No CREATE TABLE permission found on schema {schema_full_name}"
+                print(f"  ❌ {error_message}")
+        except Exception as grant_error:
+            error_message = f"Cannot check grants on schema: {str(grant_error)}"
+            print(f"  ❌ {error_message}")
+            
+except Exception as e:
+    error_message = f"Validation failed: {str(e)}"
+
+# Fail fast if validation didn't pass
+if not validation_passed:
+    error_msg = f"""
+    ❌ PREREQUISITE CHECK FAILED ❌
+    
+    Results table: {RESULTS_TABLE_NAME}
+    
+    Error: {error_message}
+    
+    Required actions:
+    1. Ensure the catalog and schema exist:
+       CREATE CATALOG IF NOT EXISTS {catalog_name};
+       CREATE SCHEMA IF NOT EXISTS {schema_full_name};
+    2. Grant the service principal CREATE TABLE permission:
+       GRANT CREATE TABLE ON SCHEMA {schema_full_name} TO `<service-principal-id>`
+    3. Or pre-create the table with appropriate schema
+    
+    Job will not proceed until prerequisites are met.
+    """
+    print(error_msg)
+    raise PermissionError(error_msg)
+
+print("\n" + "="*80)
+print("✅ ALL PREREQUISITES VALIDATED - JOB CAN PROCEED")
+print("="*80 + "\n")
 
 # COMMAND ----------
 
