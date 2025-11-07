@@ -390,7 +390,9 @@ with batch_tab:
                     "run_id": None,
                     "final_results_df": None,
                     "results_written_path": None,
-                    "completed_job_url": None
+                    "completed_job_url": ss.run_page_url,  # Keep the job URL for failed jobs
+                    "completed_job_id": ss.job_id,
+                    "completed_run_id": run_info.run_id
                 })
                 st.rerun()
             elif ss.job_status in [RunLifeCycleState.INTERNAL_ERROR, RunLifeCycleState.SKIPPED]:
@@ -398,7 +400,10 @@ with batch_tab:
                     "job_error_message": f"Job failed with status: {ss.job_status.value}. Reason: {run_info.state.state_message}",
                     "run_id": None,
                     "final_results_df": None,
-                    "results_written_path": None
+                    "results_written_path": None,
+                    "completed_job_url": ss.run_page_url,  # Keep the job URL for failed jobs
+                    "completed_job_id": ss.job_id,
+                    "completed_run_id": run_info.run_id
                 })
                 st.rerun()
         except Exception:
@@ -410,9 +415,29 @@ with batch_tab:
     else:
         if ss.get("job_error_message"):
             st.header("❌ Job Failed")
+            
+            # Display job information even for failed jobs
+            if ss.get("completed_job_url"):
+                with st.container(border=True):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if ss.get("completed_job_id"):
+                            st.markdown(f"**Job ID:** `{ss.completed_job_id}`")
+                        if ss.get("completed_run_id"):
+                            st.markdown(f"**Run ID:** `{ss.completed_run_id}`")
+                    with col2:
+                        st.markdown(f"**Job Run:** [Open in Databricks]({ss.completed_job_url}) 🔗")
+            
             st.error(ss.job_error_message)
             if st.button("Start New Batch", key="btn_restart_batch"):
-                ss.update({"job_error_message": None, "final_results_df": None, "results_written_path": None})
+                ss.update({
+                    "job_error_message": None, 
+                    "final_results_df": None, 
+                    "results_written_path": None,
+                    "completed_job_url": None,
+                    "completed_job_id": None,
+                    "completed_run_id": None
+                })
                 st.rerun()
         elif ss.final_results_df is not None:
             st.header("✅ Results from Last Completed Job")
@@ -553,14 +578,19 @@ with recon_tab:
                     "recon_error": f"Job terminated: {recon_run_info.state.result_state.value}. Reason: {recon_run_info.state.state_message}",
                     "recon_run_id": None,
                     "recon_results_df": None,
-                    "recon_completed_job_url": None
+                    "recon_completed_job_url": ss.recon_run_page_url,  # Keep the job URL for failed jobs
+                    "recon_completed_job_id": ss.recon_job_id,
+                    "recon_completed_run_id": recon_run_info.run_id
                 })
                 st.rerun()
             elif ss.recon_job_status in [RunLifeCycleState.INTERNAL_ERROR, RunLifeCycleState.SKIPPED]:
                 ss.update({
                     "recon_error": f"Job failed with status: {ss.recon_job_status.value}. Reason: {recon_run_info.state.state_message}",
                     "recon_run_id": None,
-                    "recon_results_df": None
+                    "recon_results_df": None,
+                    "recon_completed_job_url": ss.recon_run_page_url,  # Keep the job URL for failed jobs
+                    "recon_completed_job_id": ss.recon_job_id,
+                    "recon_completed_run_id": recon_run_info.run_id
                 })
                 st.rerun()
         except Exception:
@@ -572,9 +602,28 @@ with recon_tab:
     else:
         if ss.get("recon_error"):
             st.header("❌ Job Failed")
+            
+            # Display job information even for failed jobs
+            if ss.get("recon_completed_job_url"):
+                with st.container(border=True):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if ss.get("recon_completed_job_id"):
+                            st.markdown(f"**Job ID:** `{ss.recon_completed_job_id}`")
+                        if ss.get("recon_completed_run_id"):
+                            st.markdown(f"**Run ID:** `{ss.recon_completed_run_id}`")
+                    with col2:
+                        st.markdown(f"**Job Run:** [Open in Databricks]({ss.recon_completed_job_url}) 🔗")
+            
             st.error(ss.recon_error)
             if st.button("Start New Batch", key="recon_btn_restart_batch"):
-                ss.update({"recon_error": None, "recon_results_df": None})
+                ss.update({
+                    "recon_error": None, 
+                    "recon_results_df": None,
+                    "recon_completed_job_url": None,
+                    "recon_completed_job_id": None,
+                    "recon_completed_run_id": None
+                })
                 st.rerun()
         elif ss.recon_results_df is not None:
             st.header("✅ Results from Last Completed Job")
