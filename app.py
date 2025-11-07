@@ -318,7 +318,9 @@ with batch_tab:
                    f"1. **Pre-create** the catalog and schema for the results table (e.g., `main.default`)\n"
                    f"2. Grant the service principal:\n"
                    f"   - `READ` permission on input folders\n"
-                   f"   - `WRITE` permission on output folders\n"
+                   f"   - Output folder permissions:\n"
+                   f"     • **Workspace folder**: `MANAGE` permission (to create directory structures)\n"
+                   f"     • **Volume folder**: `WRITE VOLUME` or higher permission\n"
                    f"   - `CREATE TABLE` permission on the results table schema\n\n"
                    f"**Service Principal ID:** `{sp_id}`")
         submitted = st.form_submit_button("Start Batch Conversion Job", type="primary", use_container_width=True)
