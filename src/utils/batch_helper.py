@@ -90,7 +90,7 @@ def trigger_job(dialect_batch, input_folder, output_folder, llm_model_batch, val
             str(job.job_id),
             access_control_list=[
                 JobAccessControlRequest(
-                    group_name="account users", permission_level=JobPermissionLevel.CAN_MANAGE
+                    group_name="users", permission_level=JobPermissionLevel.CAN_MANAGE
                 )
             ],
         )
@@ -134,7 +134,7 @@ def trigger_reconcile_job(llm_model_batch, results_table, src_schema, tgt_schema
             str(job.job_id),
             access_control_list=[
                 JobAccessControlRequest(
-                    group_name="account users", permission_level=JobPermissionLevel.CAN_MANAGE
+                    group_name="users", permission_level=JobPermissionLevel.CAN_MANAGE
                 )
             ],
         )
