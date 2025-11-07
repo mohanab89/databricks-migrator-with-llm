@@ -1,5 +1,6 @@
 import re
 import pandas as pd
+import streamlit as st
 from databricks import sql
 from . import common_helper
 from . import prompt_helper
@@ -21,28 +22,27 @@ def prompt_to_generate_ddls_with_ai_interactive(databricks_sql, extracted_table_
     return prompt
 
 
+@st.cache_resource
+def get_sql_connection(server_hostname: str, warehouse_id: str, _credentials_provider):
+    """
+    Get a cached SQL connection to Databricks warehouse.
+    Connection is cached per warehouse_id to avoid reconnecting on every query.
+    """
+    return sql.connect(
+        server_hostname=server_hostname,
+        http_path=f"/sql/1.0/warehouses/{warehouse_id}",
+        credentials_provider=_credentials_provider,
+    )
+
+
 def execute_sql(cfg, query: str, warehouse_id: str) -> pd.DataFrame:
-    with sql.connect(
-            server_hostname=cfg.host,
-            http_path=f"/sql/1.0/warehouses/{warehouse_id}",
-            credentials_provider=lambda: cfg.authenticate,
-    ) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-            return cursor.fetchall_arrow().to_pandas()
-
-
-def execute_sqls(cfg, multi_query: str, warehouse_id: str) -> pd.DataFrame:
-    queries = [q.strip() for q in multi_query.split(";") if q.strip()]
-    with sql.connect(
-            server_hostname=cfg.host,
-            http_path=f"/sql/1.0/warehouses/{warehouse_id}",
-            credentials_provider=lambda: cfg.authenticate,
-    ) as connection:
-        with connection.cursor() as cursor:
-            for q in queries:
-                cursor.execute(q)
-            return cursor.fetchall_arrow().to_pandas()
+    """
+    Execute SQL query using a cached connection.
+    """
+    connection = get_sql_connection(cfg.host, warehouse_id, lambda: cfg.authenticate)
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        return cursor.fetchall_arrow().to_pandas()
 
 
 def split_sql_statements(s: str, keep_semicolon: bool = False):
@@ -83,10 +83,26 @@ def validate_query(databricks_sql, llm_model_interactive, cfg, warehouse_id):
         return {"valid": True, "reason": "Validation Result: [SUCCESS] Explanation: EXPLAIN ran successfully."}
 
 
-def regenerate_with_err_context(validation_result, llm_model_interactive, dialect_interactive, llm_prompts_interactive, cfg, warehouse_id, databricks_sql):
+def regenerate_with_err_context(validation_result, llm_model_interactive, dialect_interactive, llm_prompts_interactive, cfg, warehouse_id, databricks_sql, w):
+    """
+    Regenerate SQL with error context for the LLM to fix.
+    
+    Args:
+        validation_result: Dictionary with validation results
+        llm_model_interactive: The LLM model name
+        dialect_interactive: Source SQL dialect
+        llm_prompts_interactive: Additional LLM prompts
+        cfg: Databricks config
+        warehouse_id: SQL Warehouse ID
+        databricks_sql: The SQL that failed validation
+        w: WorkspaceClient instance
+    
+    Returns:
+        DataFrame with regenerated SQL
+    """
     err = validation_result['reason'].replace("'", "''")
     esc = (databricks_sql or "").replace("'", "''")
-    model_full = common_helper.get_model_full_name(llm_model_interactive)
+    model_full = common_helper.get_model_full_name(llm_model_interactive, w)
     q = f"""
         SELECT ai_query('{model_full}', {prompt_to_convert_sql_with_ai_interactive(dialect_interactive, esc, llm_prompts_interactive, err)},
          modelParameters => named_struct(

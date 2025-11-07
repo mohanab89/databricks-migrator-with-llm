@@ -2,7 +2,6 @@ from pathlib import Path
 import yaml
 import re
 from typing import Literal
-from databricks.sdk.service.sql import State as WhState
 
 SqlKind = Literal["sql_script", "procedure", "json", "xml", "workflow"]
 _COMMENT_BLOCK = re.compile(r"/\*.*?\*/", re.S)
@@ -68,6 +67,55 @@ def get_serving_endpoints(w):
     return model_dict
 
 
+def get_model_full_name(model_name, w):
+    """
+    Get the full model endpoint name from the display name.
+    
+    Args:
+        model_name: The display name of the model
+        w: WorkspaceClient instance
+    
+    Returns:
+        The full endpoint name for the model
+    """
+    model_dict = get_serving_endpoints(w)
+    return model_dict[model_name]
+
+
+def get_sorted_models(w):
+    """
+    Get LLM models sorted by preference for code migration tasks.
+    Claude and GPT models are shown first (best for code migration),
+    followed by other models alphabetically.
+    
+    Args:
+        w: WorkspaceClient instance
+    
+    Returns:
+        List of model names sorted by preference
+    """
+    models = list(get_serving_endpoints(w).keys())
+    
+    # Define preference order for code migration
+    preferred_models = []
+    other_models = []
+    
+    for model in models:
+        model_lower = model.lower()
+        # Prioritize Claude and GPT models
+        if 'claude' in model_lower or 'gpt' in model_lower:
+            preferred_models.append(model)
+        else:
+            other_models.append(model)
+    
+    # Sort each group alphabetically
+    preferred_models.sort()
+    other_models.sort()
+    
+    # Return preferred models first, then others
+    return preferred_models + other_models
+
+
 def get_dynamic_partitions(row_count: int) -> int:
     if row_count == 0:
         return 1
@@ -92,8 +140,34 @@ def get_model_params(model_name):
 
 
 def get_sql_warehouses(w):
+    """
+    Get all SQL warehouses, with serverless warehouses sorted first and labeled.
+    Returns a dict with formatted warehouse names as keys and IDs as values.
+    """
     warehouses = w.warehouses.list()
-    return {wh.name: wh.id for wh in warehouses if getattr(wh, "state", None) in (WhState.RUNNING, "RUNNING")}
+    
+    # Separate serverless and classic warehouses
+    serverless = []
+    classic = []
+    
+    for wh in warehouses:
+        # Check if warehouse is serverless
+        is_serverless = getattr(wh, "enable_serverless_compute", False) or \
+                       getattr(wh, "warehouse_type", None) == "SERVERLESS"
+        
+        if is_serverless:
+            serverless.append((f"⚡ {wh.name} (Serverless)", wh.id))
+        else:
+            classic.append((wh.name, wh.id))
+    
+    # Sort each list alphabetically by name
+    serverless.sort(key=lambda x: x[0].lower())
+    classic.sort(key=lambda x: x[0].lower())
+    
+    # Combine with serverless first
+    all_warehouses = serverless + classic
+    
+    return {name: wh_id for name, wh_id in all_warehouses}
 
 
 def get_notebook_path(w, app_name, notebook_name):

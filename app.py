@@ -47,9 +47,13 @@ def get_serving_endpoints():
     return common_helper.get_serving_endpoints(w)
 
 
-def get_model_full_name(model_name):
-    model_dict = get_serving_endpoints()
-    return model_dict[model_name]
+@st.cache_data(ttl=300, show_spinner=True)
+def get_warehouses():
+    """
+    Get SQL warehouses with a 5-minute cache.
+    Cache can be cleared manually via the refresh button.
+    """
+    return common_helper.get_sql_warehouses(w)
 
 
 # ---------------------------------
@@ -99,25 +103,39 @@ with interactive_tab:
     with col1:
         st.selectbox(
             "LLM Model",
-            list(get_serving_endpoints().keys()),
+            common_helper.get_sorted_models(w),
             index=0,
             key="llm_model_interactive",
-            help="Choose the language model to use for the conversion."
+            help="Choose the language model to use for the conversion. Claude and GPT models are recommended for code migration."
         )
     with col2:
-        try:
-            warehouses = common_helper.get_sql_warehouses(w)
-        except Exception as e:
-            st.error(f"Failed to fetch SQL warehouses: {e}")
-            warehouses = {}
-        wh_name = st.selectbox(
-            "SQL Warehouse",
-            options=list(warehouses.keys()) or [""],
-            key="warehouse_interactive",
-            help="Warehouse that runs conversion/validation queries."
-        )
-        if wh_name:
-            ss.warehouse_id = warehouses.get(wh_name)
+        # Warehouse selection with refresh capability
+        wh_col, refresh_col = st.columns([4, 1])
+        
+        with wh_col:
+            try:
+                warehouses = get_warehouses()
+            except Exception as e:
+                st.error(f"Failed to fetch SQL warehouses: {e}")
+                warehouses = {}
+            
+            if not warehouses:
+                st.warning("⚠️ No warehouses accessible. Grant the service principal access, then click refresh.")
+            
+            wh_name = st.selectbox(
+                "SQL Warehouse",
+                options=list(warehouses.keys()) or [""],
+                key="warehouse_interactive",
+                help="Warehouse that runs conversion/validation queries."
+            )
+            if wh_name:
+                ss.warehouse_id = warehouses.get(wh_name)
+        
+        with refresh_col:
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)  # Align with selectbox
+            if st.button("🔄", key="refresh_warehouses", help="Refresh warehouse list"):
+                get_warehouses.clear()
+                st.rerun()
     with col3:
         st.selectbox(
             "Source Dialect",
@@ -134,9 +152,9 @@ with interactive_tab:
         help="An optional space to provide specific rules to guide the LLM."
     )
 
-    # Service Principal Note
+    # Service Principal Access Note - Made prominent
     sp_id = os.getenv('DATABRICKS_CLIENT_ID')
-    st.info(f"ℹ️ **Note:** This app's service principal will need access to the selected warehouse to successfully execute queries. SP ID: {sp_id}")
+    st.warning(f"⚠️ **IMPORTANT:** The service principal must have `CAN USE` permission on the selected SQL Warehouse.\n\n**Service Principal ID:** `{sp_id}`")
 
     st.divider()
 
@@ -161,7 +179,7 @@ with interactive_tab:
                 with st.spinner("Converting with AI…"):
                     try:
                         escaped_sql = dialect_input.replace("'", "''")
-                        model_full = get_model_full_name(ss.llm_model_interactive)
+                        model_full = common_helper.get_model_full_name(ss.llm_model_interactive, w)
                         q = f"""
                         SELECT ai_query('{model_full}', {interactive_helper.prompt_to_convert_sql_with_ai_interactive(ss.dialect_interactive, escaped_sql, ss.llm_prompts_interactive, None)},
                              modelParameters => named_struct(
@@ -199,7 +217,7 @@ with interactive_tab:
                 if st.button("Try to Fix", use_container_width=True, key="btn_fix_interactive"):
                     with st.spinner("Re-asking the LLM with the error context…"):
                         try:
-                            df = interactive_helper.regenerate_with_err_context(ss.validation_result, ss.llm_model_interactive, ss.dialect_interactive, ss.llm_prompts_interactive, cfg, ss.warehouse_id, ss.databricks_sql)
+                            df = interactive_helper.regenerate_with_err_context(ss.validation_result, ss.llm_model_interactive, ss.dialect_interactive, ss.llm_prompts_interactive, cfg, ss.warehouse_id, ss.databricks_sql, w)
                             if not df.empty:
                                 ss.databricks_sql = df.iloc[0]['databricks_sql']
                                 ss.validation_result = None
@@ -222,10 +240,10 @@ with batch_tab:
         with c1:
             st.selectbox(
                 "LLM Model",
-                list(get_serving_endpoints().keys()),
+                common_helper.get_sorted_models(w),
                 index=0,
                 key="llm_model_batch",
-                help="Choose the language model to use for the conversion."
+                help="Choose the language model to use for the conversion. Claude and GPT models are recommended for code migration."
             )
             st.selectbox(
                 "Source Dialect",
@@ -296,7 +314,7 @@ with batch_tab:
             help="An optional space to provide specific rules to guide the LLM."
         )
 
-        st.info(f"ℹ️ **Note:** This app's service principal will need access to input and output folders. SP ID: {sp_id}.")
+        st.warning(f"⚠️ **IMPORTANT:** The service principal must have `READ/WRITE` permission on input/output folders and the results table.\n\n**Service Principal ID:** `{sp_id}`")
         submitted = st.form_submit_button("Start Batch Conversion Job", type="primary", use_container_width=True)
 
     if submitted:
@@ -309,7 +327,7 @@ with batch_tab:
                 try:
                     ss.update({"final_results_df": None, "results_written_path": None, "job_status": "SUBMITTING"})
                     ss.job_name = "Databricks Migrator Batch Conversion"
-                    job_id, run_id = batch_helper.trigger_job(ss.dialect_batch, input_folder, output_folder, get_model_full_name(ss.llm_model_interactive), ss.validation_strategy_batch, results_table, ss.rerun_failures_batch, ss.llm_prompts_batch, w, ss.job_name, ss.nb_path_batch, ss.output_language, ss.output_mode)
+                    job_id, run_id = batch_helper.trigger_job(ss.dialect_batch, input_folder, output_folder, common_helper.get_model_full_name(ss.llm_model_interactive, w), ss.validation_strategy_batch, results_table, ss.rerun_failures_batch, ss.llm_prompts_batch, w, ss.job_name, ss.nb_path_batch, ss.output_language, ss.output_mode)
                     ss.run_id = run_id
                     ss.job_id = job_id
                     st.rerun()
@@ -414,10 +432,10 @@ with recon_tab:
         with c1:
             st.selectbox(
                 "LLM Model",
-                list(get_serving_endpoints().keys()),
+                common_helper.get_sorted_models(w),
                 index=0,
                 key="reconcile_llm_model",
-                help="Choose the language model to use for reconciliation."
+                help="Choose the language model to use for reconciliation. Claude and GPT models are recommended."
             )
             recon_source_schema = st.text_input(
                 "Source schema (catalog.schema)",
@@ -445,7 +463,7 @@ with recon_tab:
                     help="The full path to the reconciliation notebook."
                 )
 
-        st.info(f"ℹ️ **Note:** This app's service principal will need access to source and target schemas. SP ID: {sp_id}.")
+        st.warning(f"⚠️ **IMPORTANT:** The service principal must have `SELECT` permission on source and target schemas.\n\n**Service Principal ID:** `{sp_id}`")
         reconcile_submitted = st.form_submit_button("Start Reconciliation Job", type="primary", use_container_width=True)
 
     if reconcile_submitted:
@@ -456,7 +474,7 @@ with recon_tab:
                 try:
                     ss.update({"recon_results_df": None, "recon_job_status": "SUBMITTING"})
                     ss.recon_job_name = "Databricks Migrator Batch Reconciliation"
-                    recon_job_id, recon_run_id = batch_helper.trigger_reconcile_job(get_model_full_name(ss.reconcile_llm_model), recon_results_table, recon_source_schema, recon_target_schema, w, ss.recon_job_name, ss.recon_nb_path)
+                    recon_job_id, recon_run_id = batch_helper.trigger_reconcile_job(common_helper.get_model_full_name(ss.reconcile_llm_model, w), recon_results_table, recon_source_schema, recon_target_schema, w, ss.recon_job_name, ss.recon_nb_path)
                     ss.recon_run_id = recon_run_id
                     ss.recon_job_id = recon_job_id
                     st.rerun()
