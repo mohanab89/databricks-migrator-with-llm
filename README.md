@@ -31,19 +31,6 @@ The app leverages **LLMs** (Claude, Llama, GPT, etc.) for query conversion, vali
 
 ---
 
-### 🔹 3. Reconcile Tables
-- Compare **source vs target schemas** (`catalog.schema` format).
-- Run reconciliation jobs that:
-    - Count rows in source and target.
-    - Highlight mismatches.
-- Results stored in a Delta table for auditing.
-- Useful for validating post-migration data consistency.
-
-![Reconcile Tables Screenshot](images/reconcile.png)
-![Reconcile Tables Screenshot](images/ReconcileReport.png)
-
----
-
 ## 🚀 Quick Start
 
 ### 1. Clone into Databricks Git Folder
@@ -97,7 +84,6 @@ Both **Interactive** and **Batch** modes have built-in retry support:
 
 1. Use **Interactive Conversion** to test a few sample queries from Snowflake.
 2. Run a **Batch Job** to convert hundreds of SQL files into Databricks notebooks.
-3. Execute the **Reconcile Tables** job to ensure source and target schemas match in counts and data samples.
 
 ---
 
