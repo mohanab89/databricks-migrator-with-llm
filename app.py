@@ -351,7 +351,7 @@ with batch_tab:
                 try:
                     ss.update({"final_results_df": None, "results_written_path": None, "job_status": "SUBMITTING"})
                     ss.job_name = "Databricks Migrator Batch Conversion"
-                    job_id, run_id = batch_helper.trigger_job(ss.dialect_batch, input_folder, output_folder, common_helper.get_model_full_name(ss.llm_model_interactive, w), ss.validation_strategy_batch, results_table, ss.rerun_failures_batch, ss.llm_prompts_batch, w, ss.job_name, ss.nb_path_batch, ss.output_language, ss.output_mode)
+                    job_id, run_id = batch_helper.trigger_job(ss.dialect_batch, input_folder, output_folder, common_helper.get_model_full_name(ss.llm_model_batch, w), ss.validation_strategy_batch, results_table, ss.rerun_failures_batch, ss.llm_prompts_batch, w, ss.job_name, ss.nb_path_batch, ss.output_language, ss.output_mode)
                     ss.run_id = run_id
                     ss.job_id = job_id
                     st.rerun()
