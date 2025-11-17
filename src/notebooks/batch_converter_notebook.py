@@ -235,7 +235,9 @@ while attempt <= MAX_RERUN_COUNT and input_df_count > 0:
         ])
         validated_df = spark.createDataFrame(validation_results, schema)
     else:
-        validated_df = converted_df
+        # When validation is skipped, add validation_result and validation_error columns
+        validated_df = converted_df.withColumn("validation_result", lit("SKIPPED")) \
+                                    .withColumn("validation_error", expr("array()"))
 
     if retried_validated_df:
         retried_validated_df = retried_validated_df.union(validated_df.where("validation_result = 'SUCCESS'"))
