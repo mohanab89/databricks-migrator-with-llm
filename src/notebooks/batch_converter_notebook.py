@@ -74,7 +74,7 @@ OUTPUT_MODE = dbutils.widgets.get("OUTPUT_MODE")
 
 import os
 import re
-from pyspark.sql.functions import collect_list, array_join, col, lit, current_timestamp, split, regexp_replace, posexplode, expr, from_json
+from pyspark.sql.functions import collect_list, array_join, col, lit, current_timestamp, split, regexp_replace, posexplode, expr, from_json, array
 from datetime import datetime
 from src.utils import common_helper, batch_helper
 from pyspark.sql.functions import udf
@@ -237,7 +237,7 @@ while attempt <= MAX_RERUN_COUNT and input_df_count > 0:
     else:
         # When validation is skipped, add validation_result and validation_error columns
         validated_df = converted_df.withColumn("validation_result", lit("SKIPPED")) \
-                                    .withColumn("validation_error", expr("array()"))
+                                    .withColumn("validation_error", array().cast("array<string>"))
 
     if retried_validated_df:
         retried_validated_df = retried_validated_df.union(validated_df.where("validation_result = 'SUCCESS'"))
