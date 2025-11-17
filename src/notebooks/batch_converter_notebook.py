@@ -240,16 +240,18 @@ while attempt <= MAX_RERUN_COUNT and input_df_count > 0:
                                     .withColumn("validation_error", array().cast("array<string>"))
 
     if retried_validated_df:
-        retried_validated_df = retried_validated_df.union(validated_df.where("validation_result = 'SUCCESS'"))
+        retried_validated_df = retried_validated_df.union(validated_df.where("validation_result IN ('SUCCESS', 'SKIPPED')"))
     else:
-        retried_validated_df = validated_df.where("validation_result = 'SUCCESS'")
-    input_df = validated_df.where("validation_result != 'SUCCESS'")
+        retried_validated_df = validated_df.where("validation_result IN ('SUCCESS', 'SKIPPED')")
+    # Only retry FAILURE rows (not SUCCESS or SKIPPED)
+    input_df = validated_df.where("validation_result = 'FAILURE'")
     input_df_count = input_df.count()
 
+# After retries exhausted, add any remaining FAILURE rows to the final result
 if retried_validated_df:
-    retried_validated_df = retried_validated_df.union(validated_df.where("validation_result != 'SUCCESS'"))
+    retried_validated_df = retried_validated_df.union(validated_df.where("validation_result = 'FAILURE'"))
 else:
-    retried_validated_df = validated_df.where("validation_result != 'SUCCESS'")
+    retried_validated_df = validated_df.where("validation_result = 'FAILURE'")
 
 # Prepare final DataFrame with metadata and upsert into results table, marking previous versions as not latest
 final_df = retried_validated_df.withColumn("converted_at", current_timestamp()) \
