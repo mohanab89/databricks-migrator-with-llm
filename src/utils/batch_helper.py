@@ -194,23 +194,33 @@ def write_output_files(input_path, input_folder, databricks_output_folder, outpu
     file_path = input_path.replace(input_direc, databricks_output_folder)
     file_path_without_ext = os.path.splitext(file_path)[0]
     if file_path_without_ext.startswith('/Workspace/'):
-        if output_type.lower() == 'sql':
-            language = workspace.Language.SQL
-        else:
-            language = workspace.Language.PYTHON
         if output_mode.lower() == 'file':
+            # For file mode, create plain .sql or .py files (not notebooks)
             if output_type.lower() == 'sql':
                 file_path_without_ext = f'{file_path_without_ext}.sql'
             else:
                 file_path_without_ext = f'{file_path_without_ext}.py'
-
-        w.workspace.import_(
-            content=base64.b64encode(content_to_write.encode()).decode(),
-            format=workspace.ImportFormat.SOURCE,
-            language=language,
-            overwrite=True,
-            path=file_path_without_ext,
-        )
+            
+            w.workspace.import_(
+                content=base64.b64encode(content_to_write.encode()).decode(),
+                format=workspace.ImportFormat.AUTO,  # AUTO format creates plain files
+                overwrite=True,
+                path=file_path_without_ext,
+            )
+        else:
+            # For notebook/workflow mode, create notebook files
+            if output_type.lower() == 'sql':
+                language = workspace.Language.SQL
+            else:
+                language = workspace.Language.PYTHON
+            
+            w.workspace.import_(
+                content=base64.b64encode(content_to_write.encode()).decode(),
+                format=workspace.ImportFormat.SOURCE,
+                language=language,
+                overwrite=True,
+                path=file_path_without_ext,
+            )
     else:
         if output_type.lower() == 'sql':
             file_path = f'{file_path_without_ext}.sql'
