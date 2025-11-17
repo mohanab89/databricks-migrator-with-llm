@@ -30,7 +30,7 @@ dbutils.widgets.text("ADDITIONAL_PROMPTS", "", "Any additional prompts to be fed
 dbutils.widgets.text("VALIDATE_RESULTS", "Yes", "Validate Results")
 dbutils.widgets.text("MAX_RERUN_COUNT", "1", "Number of times to rerun in case of error")
 dbutils.widgets.text("OUTPUT_LANG", "sql", "The notebook language for output: sql or python")
-dbutils.widgets.text("OUTPUT_MODE", "notebook", "The output mode: notebook/workflow")
+dbutils.widgets.text("OUTPUT_MODE", "notebook", "The output mode: notebook/workflow/file")
 
 # COMMAND ----------
 
@@ -67,13 +67,14 @@ ADDITIONAL_PROMPTS = dbutils.widgets.get("ADDITIONAL_PROMPTS")
 # The language of output notebook: sql or python.
 OUTPUT_LANG = dbutils.widgets.get("OUTPUT_LANG")
 
-# The mode of output notebook: notebook or workflow.
+# The mode of output: notebook, workflow, or file.
 OUTPUT_MODE = dbutils.widgets.get("OUTPUT_MODE")
 
 # COMMAND ----------
 
 import os
 import re
+import pandas as pd
 from pyspark.sql.functions import collect_list, array_join, col, lit, current_timestamp, split, regexp_replace, posexplode, expr, from_json, array
 from datetime import datetime
 from src.utils import common_helper, batch_helper
@@ -275,9 +276,18 @@ if not DATABRICKS_OUTPUT_FOLDER or DATABRICKS_OUTPUT_FOLDER.strip() == "":
 else:
     # Rebuild complete files and write the content.
     df_to_write = written_df
-    if OUTPUT_MODE.lower() != 'workflow':
+    if OUTPUT_MODE.lower() == 'notebook':
+        # For notebook mode, build proper notebook structure with headers and cell separators
         df_to_write = (df_to_write.groupby("input_file")
                        .applyInPandas(batch_helper.build_file_content, schema="input_file string, content_to_write string"))
+    elif OUTPUT_MODE.lower() == 'file':
+        # For file mode, concatenate raw SQL/Python without notebook formatting
+        df_to_write = (df_to_write.groupby("input_file")
+                       .applyInPandas(lambda pdf: pd.DataFrame([[
+                           pdf["input_file"].iloc[0],
+                           "\n".join(pdf.sort_values("position")["databricks_sql"].tolist())
+                       ]], columns=["input_file", "content_to_write"]), 
+                       schema="input_file string, content_to_write string"))
 
     DATABRICKS_OUTPUT_FOLDER = DATABRICKS_OUTPUT_FOLDER if DATABRICKS_OUTPUT_FOLDER.endswith('/') else f'{DATABRICKS_OUTPUT_FOLDER}/'
     batch_helper.mirror_structure(INPUT_FOLDER, DATABRICKS_OUTPUT_FOLDER)
