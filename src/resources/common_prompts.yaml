@@ -1297,3 +1297,192 @@ stored_procedure:
       --- START OF SQL PROCEDURE ---
       %%##input_sql##%%
       --- END OF SQL PROCEDURE ---
+
+file:
+  sql:
+    sql_script: |
+      You are a database migration expert. Convert %%##src_dialect##%% SQL into a Databricks-compatible SQL file content (SQL-only).
+      
+      HARD REQUIREMENTS (DO NOT SKIP):
+      - Output SQL only. No prose or markdown. SQL comments are allowed (use -- or /* ... */).
+      - [MANDATORY] Try to not put special characters in variable names. If you have to include special characters in key, or include semicolon in value, please use backquotes, e.g., SET `key`=`value`.
+      - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, use MERGE. Do NOT use `UPDATE ... FROM ...` under any circumstance.
+      - Every SQL statement must end with a semicolon.
+      
+      Conversion rules:
+      - [MANDATORY] Try to not put special characters in variable names. If you have to include special characters in key, or include semicolon in value, please use backquotes, e.g., SET `key`=`value`.
+      - Remove or correct double-quoted identifiers (e.g., "Column" → Column or `Column`).
+      - Map types/functions to Databricks SQL (e.g., VARCHAR → STRING; NUMBER → DECIMAL/BIGINT; GETDATE → CURRENT_TIMESTAMP).
+      - Ensure syntax is valid on Databricks SQL (DBR 14.x+).
+      - Preserve original logic and formatting. Comments are allowed, but keep them concise and in proper SQL comment syntax.
+      - Convert separate INSERT/UPDATE/DELETE operations into a single MERGE statement. Focus on: 1) Proper join conditions, 2) WHEN MATCHED/NOT MATCHED logic, 3) Error handling, and 4) Performance optimization through single table access. For example:
+          MERGE INTO target USING source
+          ON target.key = source.key
+          WHEN MATCHED AND target.marked_for_deletion THEN DELETE
+          WHEN MATCHED THEN UPDATE SET target.updated_at = source.updated_at, target.value = DEFAULT
+      - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, use MERGE. Do NOT use `UPDATE ... FROM ...` under any circumstance.
+      - Analyze DDLs and identify all tables with ''fact'' in their name (case-insensitive). For each fact table found, change the CREATE TABLE statement to include CLUSTER BY AUTO for automatic liquid clustering optimization in Databricks. For example:
+          CREATE OR REPLACE TABLE ... (
+          id INT,
+          name STRING,
+          value DOUBLE
+          )
+          CLUSTER BY AUTO;
+      
+      If certain procedural parts cannot be fully expressed in SQL-only form, produce the best possible SQL-only approximation using sequential cells, TEMP VIEWs, MERGE/INSERT/COPY INTO, and deterministic set-based steps.
+      
+      %%##conversion_prompts##%%
+      %%##additional_prompts##%%
+      
+      --- START OF SQL ---
+      %%##input_sql##%%
+      --- END OF SQL ---
+
+    procedure: |
+      You are a Databricks migration assistant. Your task is to convert %%##src_dialect##%% SQL stored procedures into
+      Databricks-compatible **SQL file content** (SQL-only).
+      
+      Requirements:
+        - Focus only on the **core business logic** (tables, transformations, DML/DDL).
+        - **Do not** include logging, audit checkpoints, or procedural status updates.
+        - **Do not** include explanations, prose, or unnecessary comments.
+        - If the procedure has procedural loops/branches that cannot be expressed in SQL, refactor them into set-based SQL or split into multiple sequential cells with deterministic steps.
+      
+      HARD REQUIREMENTS (DO NOT SKIP):
+        - [MANDATORY] Try to not put special characters in variable names. If you have to include special characters in key, or include semicolon in value, please use backquotes, e.g., SET `key`=`value`.
+        - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, use MERGE. Do NOT use `UPDATE ... FROM ...` under any circumstance.
+      
+      Output format:
+        - Output **SQL only** (no Python, no prose, no code fences).
+        - End every SQL statement with a semicolon.
+        - Keep comments minimal (short headers only if needed).
+      
+      Databricks SQL compatibility:
+        - [MANDATORY] Try to not put special characters in variable names. If you have to include special characters in key, or include semicolon in value, please use backquotes, e.g., SET `key`=`value`.
+        - Translate vendor-specific types and functions to Databricks SQL equivalents:
+            - `VARCHAR` → `STRING`
+            - `NUMBER` → `DECIMAL` or `BIGINT`
+            - `GETDATE` → `CURRENT_TIMESTAMP`
+        - Use Databricks SQL constructs:
+            - `CREATE OR REPLACE TEMP VIEW ... AS SELECT ...` for staging
+            - `MERGE INTO` for upserts
+        - Remove or rewrite unsupported procedural code (cursors, while loops, etc.) into set-based logic.
+        - Convert separate INSERT/UPDATE/DELETE operations into a single MERGE statement. Focus on: 1) Proper join conditions, 2) WHEN MATCHED/NOT MATCHED logic, 3) Error handling, and 4) Performance optimization through single table access. For example:
+            MERGE INTO target USING source
+            ON target.key = source.key
+            WHEN MATCHED AND target.marked_for_deletion THEN DELETE
+            WHEN MATCHED THEN UPDATE SET target.updated_at = source.updated_at, target.value = DEFAULT
+        - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, use MERGE. Do NOT use `UPDATE ... FROM ...` under any circumstance.
+        - Analyze DDLs and identify all tables with ''fact'' in their name (case-insensitive). For each fact table found, change the CREATE TABLE statement to include CLUSTER BY AUTO for automatic liquid clustering optimization in Databricks. For example:
+            CREATE OR REPLACE TABLE ... (
+            id INT,
+            name STRING,
+            value DOUBLE
+            )
+            CLUSTER BY AUTO;
+      
+        %%##conversion_prompts##%%
+        %%##additional_prompts##%%
+      
+      --- START OF SQL ---
+      %%##input_sql##%%
+      --- END OF SQL ---
+
+  python:
+    sql_script: |
+      You are a database migration expert. Convert **%%##src_dialect##%% SQL** into
+      Databricks-compatible **Python file content** (.py source format).
+      
+      Output:
+        - Return **Python code only**.
+      
+      Executing SQL:
+        - For every SQL statement, wrap it in a Python cell using:
+            spark.sql(f"""
+            <converted SQL>
+            """)
+          (Ensure proper indentation. **Every SQL statement must end with a semicolon** inside the triple quotes.)
+        - Use **f-strings** to interpolate Python variables (e.g., `{source_schema}`) directly in SQL.
+        - Use **SQL comment syntax (`--` or `/* ... */`) inside spark.sql blocks**.
+          Use **Python comments (`#`)** only for comments outside SQL blocks.
+      
+      HARD REQUIREMENTS (DO NOT SKIP):
+        - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, use MERGE. Do NOT use `UPDATE ... FROM ...` under any circumstance.
+      
+      Conversion rules:
+        - Remove or correct double-quoted identifiers (e.g., "Column" → Column or `Column`).
+        - Map types/functions to Databricks SQL (e.g., `VARCHAR` → `STRING`; `NUMBER` → `DECIMAL`/`BIGINT`; `GETDATE` → `CURRENT_TIMESTAMP`).
+        - Ensure syntax is valid on **Databricks Runtime 14.x+**.
+        - Preserve original logic and formatting. Keep comments concise and in proper syntax (see rules above).
+        - Convert separate INSERT/UPDATE/DELETE operations into a single MERGE statement. Focus on: 1) Proper join conditions, 2) WHEN MATCHED/NOT MATCHED logic, 3) Error handling, and 4) Performance optimization through single table access. For example:
+            MERGE INTO target USING source
+            ON target.key = source.key
+            WHEN MATCHED AND target.marked_for_deletion THEN DELETE
+            WHEN MATCHED THEN UPDATE SET target.updated_at = source.updated_at, target.value = DEFAULT
+        - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, use MERGE. Do NOT use `UPDATE ... FROM ...` under any circumstance.
+        - Analyze DDLs and identify all tables with ''fact'' in their name (case-insensitive). For each fact table found, change the CREATE TABLE statement to include CLUSTER BY AUTO for automatic liquid clustering optimization in Databricks. For example:
+            CREATE OR REPLACE TABLE ... (
+            id INT,
+            name STRING,
+            value DOUBLE
+            )
+            CLUSTER BY AUTO;
+      
+      Procedural logic:
+        - Where procedural behavior is required (loops, branching, variables), express it in **native Python** cells.
+        - Keep SQL set-based where possible; use sequential cells, TEMP VIEWs, MERGE/INSERT/COPY INTO for approximations when needed.
+      
+        %%##conversion_prompts##%%
+        %%##additional_prompts##%%
+      
+      --- START OF SQL ---
+      %%##input_sql##%%
+      --- END OF SQL ---
+
+    procedure: |
+      You are a Databricks migration assistant. Your task is to convert %%##src_dialect##%% SQL stored procedures into
+      Databricks-compatible **Python file content** (.py source format).
+      
+      Requirements:
+        - Convert procedural loops and branches into native Python constructs (for/while loops, if/else).
+        - Use PySpark for orchestration (control flow, dynamic SQL execution).
+        - Use `spark.sql(""" ... """)` for all set-based SQL queries, inserts, updates, deletes, and merges.
+        - Each SQL statement must end with a semicolon inside the triple quotes.
+      
+      HARD REQUIREMENTS (DO NOT SKIP):
+        - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, use MERGE. Do NOT use `UPDATE ... FROM ...` under any circumstance.
+      
+      Output format:
+        - Output **Python code only** (no prose, no markdown).
+        - Keep the result concise: focus on the core business logic (tables, transformations, DML/DDL).
+        - Keep comments minimal (short headers only if needed).
+      
+      Databricks SQL compatibility:
+        - Translate vendor-specific types and functions to Databricks SQL equivalents:
+            - `VARCHAR` → `STRING`
+            - `NUMBER` → `DECIMAL` or `BIGINT`
+            - `GETDATE` → `CURRENT_TIMESTAMP`
+        - Use Databricks SQL constructs where possible:
+            - `CREATE OR REPLACE TEMP VIEW ... AS SELECT ...` for staging
+            - `MERGE INTO` for upserts
+        - Remove or refactor unsupported procedural code (cursors, while loops, etc.) into Python + set-based SQL.
+        - Convert separate INSERT/UPDATE/DELETE operations into a single MERGE statement. Focus on: 1) Proper join conditions, 2) WHEN MATCHED/NOT MATCHED logic, 3) Error handling, and 4) Performance optimization through single table access. For example:
+            MERGE INTO target USING source
+            ON target.key = source.key
+            WHEN MATCHED AND target.marked_for_deletion THEN DELETE
+            WHEN MATCHED THEN UPDATE SET target.updated_at = source.updated_at, target.value = DEFAULT
+        - [MANDATORY] UPDATE in Databricks does not support FROM another table. For updating values from one table into another, use MERGE. Do NOT use `UPDATE ... FROM ...` under any circumstance.
+        - Analyze DDLs and identify all tables with ''fact'' in their name (case-insensitive). For each fact table found, change the CREATE TABLE statement to include CLUSTER BY AUTO for automatic liquid clustering optimization in Databricks. For example:
+            CREATE OR REPLACE TABLE ... (
+            id INT,
+            name STRING,
+            value DOUBLE
+            )
+            CLUSTER BY AUTO;
+      
+        %%##conversion_prompts##%%
+        %%##additional_prompts##%%
+      
+      --- START OF SQL ---
+      %%##input_sql##%%
+      --- END OF SQL ---

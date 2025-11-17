@@ -184,7 +184,7 @@ def mirror_structure(input_path: str, output_path: str):
             print(f"Created {target_dir}")
 
 
-def write_output_files(input_path, input_folder, databricks_output_folder, output_type, content_to_write, w):
+def write_output_files(input_path, input_folder, databricks_output_folder, output_type, output_mode, content_to_write, w):
     if input_path.startswith("dbfs:/Volumes/"):
         input_path = input_path.replace("dbfs:/", "/")
     elif input_path.startswith("file:"):
@@ -198,6 +198,12 @@ def write_output_files(input_path, input_folder, databricks_output_folder, outpu
             language = workspace.Language.SQL
         else:
             language = workspace.Language.PYTHON
+        if output_mode.lower() == 'file':
+            if output_type.lower() == 'sql':
+                file_path_without_ext = f'{file_path_without_ext}.sql'
+            else:
+                file_path_without_ext = f'{file_path_without_ext}.py'
+
         w.workspace.import_(
             content=base64.b64encode(content_to_write.encode()).decode(),
             format=workspace.ImportFormat.SOURCE,
@@ -404,7 +410,7 @@ def create_folder_path_for_workflow(input_path, input_folder, databricks_output_
     return file_path, file_path_without_ext
 
 
-def create_workflow(json_content, input_path, input_folder, databricks_output_folder, output_lang, w):
+def create_workflow(json_content, input_path, input_folder, databricks_output_folder, output_lang, output_mode, w):
     workflow_json = json.loads(json_content)
     file_path, file_path_without_ext = create_folder_path_for_workflow(input_path, input_folder, databricks_output_folder)
     all_tasks = []
@@ -423,7 +429,7 @@ def create_workflow(json_content, input_path, input_folder, databricks_output_fo
         out_pandas_df = build_file_content(pandas_df)
         out = str(out_pandas_df.loc[0, "content_to_write"])
 
-        write_output_files(file_name, input_folder, databricks_output_folder, output_lang, out, w)
+        write_output_files(file_name, input_folder, databricks_output_folder, output_lang, output_mode, out, w)
         task = Task(task_key=task_name, notebook_task=NotebookTask(notebook_path=f"{file_path}/{task_name}", base_parameters=tasks['parameters']), depends_on=task_dependencies)
         all_tasks.append(task)
 

@@ -288,14 +288,14 @@ else:
 
         if OUTPUT_MODE.lower() == 'workflow':
             try:
-                job_id = batch_helper.create_workflow(row["databricks_sql"], input_path, INPUT_FOLDER, DATABRICKS_OUTPUT_FOLDER, OUTPUT_LANG, w)
+                job_id = batch_helper.create_workflow(row["databricks_sql"], input_path, INPUT_FOLDER, DATABRICKS_OUTPUT_FOLDER, OUTPUT_LANG, OUTPUT_MODE, w)
                 job_url = f"{context.apiUrl().get()}/jobs/{job_id}"
                 displayHTML(f'<p><strong>Job created for {input_path}: </strong><a href="{job_url}" target="_blank">{job_url}</a></p>')
             except Exception as exc:
                 print(f"Failed to create workflow for {input_path}: {exc}")
         else:
             try:
-                batch_helper.write_output_files(input_path, INPUT_FOLDER, DATABRICKS_OUTPUT_FOLDER, OUTPUT_LANG, row['content_to_write'], w)
+                batch_helper.write_output_files(input_path, INPUT_FOLDER, DATABRICKS_OUTPUT_FOLDER, OUTPUT_LANG, OUTPUT_MODE, row['content_to_write'], w)
             except Exception as exc:
                 print(f"Failed to write {input_path}: {exc}")
 
