@@ -35,7 +35,8 @@ redshift: |
   - JSON:
     - `json_extract_path_text(col,''a'',''b'')` → `get_json_object(col, ''$.a.b'')`
   - DDL/storage:
-    - `DISTSTYLE`, `DISTKEY`, `SORTKEY`, `ENCODE`, `COMPOUND/INTERLEAVED` → not applicable; drop or comment
+    - `DISTSTYLE`, `SORTKEY`, `ENCODE`, `COMPOUND/INTERLEAVED` → not applicable; drop or comment
+    - `DISTKEY`→ use cluster by
     - `IDENTITY(seed, step)` → `GENERATED ALWAYS AS IDENTITY` (Delta)
   - External tables/Spectrum → use `LOCATION ''s3://...''` with Delta/Unity Catalog patterns
   - "Rewrite analytic functions such as QUALIFY or DISTINCT ON to standard SQL or Databricks equivalents using ROW_NUMBER() in subqueries."
