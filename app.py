@@ -351,6 +351,7 @@ with batch_tab:
                 try:
                     ss.update({"final_results_df": None, "results_written_path": None, "job_status": "SUBMITTING"})
                     ss.job_name = "Databricks Migrator Batch Conversion"
+                    ss.output_folder = output_folder  # Store output folder in session state
                     job_id, run_id = batch_helper.trigger_job(ss.dialect_batch, input_folder, output_folder, common_helper.get_model_full_name(ss.llm_model_batch, w), ss.validation_strategy_batch, results_table, ss.rerun_failures_batch, ss.llm_prompts_batch, w, ss.job_name, ss.nb_path_batch, ss.output_language, ss.output_mode)
                     ss.run_id = run_id
                     ss.job_id = job_id
@@ -383,15 +384,20 @@ with batch_tab:
                 result_json = w.jobs.get_run_output(run_id=run_info.tasks[0].run_id)
                 result_data = json.loads(result_json.notebook_output.result)
                 results_df = pd.DataFrame(result_data)
-                if output_folder.lower().startswith('/volumes/'):
-                    parts = [p for p in output_folder.split("/") if p]
-                    prefix = "/" + "/".join(parts[:4])
-                    encoded = quote(output_folder, safe="")
-                    results_written_path_url = f"https://{os.environ.get('DATABRICKS_HOST')}/explore/data{prefix}?volumePath={encoded}"
-                elif output_folder.lower().startswith('/workspace/'):
-                    results_written_path_url = f"https://{os.environ.get('DATABRICKS_HOST')}#workspace{quote(output_folder, safe='/:')}"
-                else:
-                    results_written_path_url = None
+                
+                # Generate output path URL if output_folder was provided
+                results_written_path_url = None
+                if ss.get('output_folder'):
+                    output_folder_path = ss.output_folder
+                    if output_folder_path.lower().startswith('/volumes/'):
+                        parts = [p for p in output_folder_path.split("/") if p]
+                        prefix = "/" + "/".join(parts[:4])
+                        encoded = quote(output_folder_path, safe="")
+                        results_written_path_url = f"https://{os.environ.get('DATABRICKS_HOST')}/explore/data{prefix}?volumePath={encoded}"
+                    elif output_folder_path.lower().startswith('/workspace/'):
+                        results_written_path_url = f"https://{os.environ.get('DATABRICKS_HOST')}#workspace{quote(output_folder_path, safe='/:')}"
+                    # For other paths, keep it as plain text (no URL)
+                    # Store the path even if we can't generate a clickable URL
 
                 ss.update({
                     "job_error_message": None,
@@ -453,6 +459,7 @@ with batch_tab:
                     "job_error_message": None, 
                     "final_results_df": None, 
                     "results_written_path": None,
+                    "output_folder": None,
                     "completed_job_url": None,
                     "completed_job_id": None,
                     "completed_run_id": None
@@ -474,17 +481,25 @@ with batch_tab:
                         st.markdown(f"**Job Run:** [Open in Databricks]({ss.completed_job_url}) 🔗")
             
             st.dataframe(ss.final_results_df, use_container_width=True)
-            if ss.results_written_path is not None:
-                st.markdown(
-                    f"📂 Output has been written to: [**{output_folder}**]({ss.get('results_written_path')})",
-                    unsafe_allow_html=True,
-                )
+            
+            # Show output folder path if it was provided
+            if ss.get('output_folder'):
+                if ss.results_written_path:
+                    # If we have a clickable URL, show it
+                    st.markdown(
+                        f"📂 Output has been written to: [**{ss.output_folder}**]({ss.results_written_path})",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    # If no URL (e.g., local path), just show the path
+                    st.markdown(f"📂 Output has been written to: **{ss.output_folder}**")
 
             if st.button("Start New Batch", key="btn_new_batch"):
                 ss.update({
                     "job_error_message": None, 
                     "final_results_df": None, 
                     "results_written_path": None,
+                    "output_folder": None,
                     "completed_job_url": None,
                     "completed_job_id": None,
                     "completed_run_id": None
